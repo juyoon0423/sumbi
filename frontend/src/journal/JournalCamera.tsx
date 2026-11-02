@@ -2,7 +2,7 @@ import { useThree } from '@react-three/fiber'
 import { useEffect } from 'react'
 import { PerspectiveCamera, Vector3 } from 'three'
 import { player } from '../player/runtime'
-import { BULTEOK } from '../world/bulteok/layout'
+import { bulteokFrontYaw } from '../world/bulteok/seatWalk'
 import { setShooter } from './capture'
 
 const cam = new PerspectiveCamera(38, 1, 0.1, 6000)
@@ -19,11 +19,7 @@ export function JournalCamera() {
       // 해녀 앞쪽 비스듬히, 조금 위에서 (얼굴과 뒤 풍경이 같이 보이게).
       // 불턱에선 공동 대야가 앞을 가리지 않게 대야에서 먼 쪽으로
       const pos = player.pos
-      let yaw = player.yaw + 0.42
-      if (player.zone === 'bulteok') {
-        const side = (y: number) => Math.hypot(pos.x + Math.sin(y) * 2.6 - BULTEOK.basin.x, pos.z + Math.cos(y) * 2.6 - BULTEOK.basin.z)
-        if (side(player.yaw - 0.42) > side(yaw)) yaw = player.yaw - 0.42
-      }
+      const yaw = player.zone === 'bulteok' ? bulteokFrontYaw(pos.x, pos.z, player.yaw) : player.yaw + 0.42
       const dist = player.zone === 'bulteok' ? 3.1 : 3.0
       look.set(pos.x, pos.y + (player.zone === 'bulteok' ? 0.18 : 0.32), pos.z)
       cam.position.set(look.x + Math.sin(yaw) * dist, look.y + (player.zone === 'bulteok' ? 0.85 : 0.55), look.z + Math.cos(yaw) * dist)
