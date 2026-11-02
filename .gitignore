@@ -1,0 +1,50 @@
+# ── 공통 ──
+.DS_Store
+Thumbs.db
+*.log
+logs/
+tmp/
+
+# 에디터
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.sw?
+
+# 비밀 정보·로컬 설정
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+
+# ── 프론트엔드 (Node / Vite) ──
+node_modules/
+dist/
+dist-ssr/
+.vite/
+coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.vercel/
+
+# ── 백엔드 (Java / Spring Boot / Gradle) ──
+.gradle/
+build/
+out/
+target/
+!gradle/wrapper/gradle-wrapper.jar
+*.class
+.settings/
+.project
+.classpath
+bin/
+HELP.md
+
+# ── 배포 ──
+deploy/data/
