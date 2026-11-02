@@ -23,10 +23,11 @@ const ENTRY_YAW = 0.3
 const BASE_FOV = 50
 
 /**
- * 둥둥 구도 (누운 해녀 기준): 발 쪽 옆에서 수면 가까이, 머리 너머 하늘을 올려다봄.
+ * 둥둥 구도 (누운 해녀 기준): 발 쪽 비스듬히 옆에서 수면 가까이, 머리 너머 하늘을 올려다봄.
  * back: 몸 중심에서 발 쪽으로, side: 옆으로, up: 수면 위, elev: 머리보다 더 올려다보는 각도, turn: 옆으로 비켜 보는 각도
+ * 조금 멀리·옆에서 보면 테왁이 얼굴을 가리지 않고, 해녀는 아래쪽에 머리와 테왁 윗부분만, 나머지는 하늘
  */
-export const FLOAT_VIEW = { back: 2.2, side: 0.35, up: 0.6, elev: 0.48, turn: 0.1 }
+export const FLOAT_VIEW = { back: 3.0, side: 1.2, up: 0.7, elev: 0.5, turn: 0.03 }
 
 export function FollowCamera() {
   const { camera, gl, size } = useThree()
