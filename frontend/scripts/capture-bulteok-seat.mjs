@@ -5,7 +5,6 @@
 // - B·C 가 같은 자리를 동시에 누름 → 한 명만 앉고 다른 한 명은 "앗"
 // - 걷다가 다른 자리 누르면 방향 바꾸기, 걷는 중 연결이 끊기면 목적지 자리가 빔
 // - 자리가 다 차면 담 밖에 서서 불 쬐기 → 자리가 나면 입구로 들어와 앉기
-// - 정면 시점 자동 전환 (앉아서 2.5초 → 앞쪽), 끌기·자리 누르기로 바로 제어권
 // 사용법: 백엔드 + 프론트 실행 중에  node scripts/capture-bulteok-seat.mjs <출력폴더> [원본프레임폴더]
 import { chromium } from 'playwright'
 import { spawn } from 'node:child_process'
@@ -51,7 +50,7 @@ const toBulteok = async (who) => {
   await who.page.evaluate(() => window.__sumbi.travel('bulteok'))
   await who.page.waitForFunction(() => window.__sumbi.bulteok.getState().zone === 'bulteok' && !window.__sumbi.bulteok.getState().traveling, null, { timeout: 8000 })
 }
-/** 카메라 고정 (자동 시점 끔): 해녀 기준 turn 만큼 돌아서 */
+/** 카메라 고정 (해녀 기준 turn 만큼 돌아서, 등 뒤 자동 복귀 끔) */
 const fixCam = (who, turn, dist, pitch) =>
   who.page.evaluate(
     ([turn, dist, pitch]) => {
@@ -60,16 +59,9 @@ const fixCam = (who, turn, dist, pitch) =>
       cameraRig.distance = dist
       cameraRig.pitch = pitch
       cameraRig.lastDragAt = 1e15
-      cameraRig.lastInputAt = 1e15
     },
     [turn, dist, pitch],
   )
-const freeCam = (who) =>
-  who.page.evaluate(() => {
-    const r = window.__sumbi.cameraRig
-    r.lastDragAt = -Infinity
-    r.lastInputAt = performance.now()
-  })
 const mySeat = (who) => who.page.evaluate(() => window.__sumbi.player.seat)
 const seatsSeenBy = (who) =>
   who.page.evaluate(() => {
@@ -280,50 +272,6 @@ await waitSeated(A, redirect, 20000)
 check((await mySeat(A)) === redirect, `걷다가 ${redirect}번으로 방향 바꿔 앉음`)
 check((await B.page.evaluate((id) => window.__sumbi.remotes.get(id).seat, ids.A)) === redirect, 'B 화면에서도 같은 자리')
 
-// ── 5) 정면 시점 자동 전환 ──
-await freeCam(A)
-await A.page.evaluate(() => {
-  const r = window.__sumbi.cameraRig
-  r.yaw = window.__sumbi.player.yaw + Math.PI
-  r.pitch = 0.4
-  r.distance = 4.4
-})
-await wait(500)
-await jpeg(A, 'seat-7-camera-before-behind')
-const yawDiff = () =>
-  A.page.evaluate(() => {
-    const { player, cameraRig } = window.__sumbi
-    return Math.abs(Math.atan2(Math.sin(cameraRig.yaw - player.yaw), Math.cos(cameraRig.yaw - player.yaw)))
-  })
-const before = await yawDiff()
-await wait(1500)
-check(Math.abs((await yawDiff()) - before) < 0.02, '조작 직후 2.5초 전에는 시점이 그대로')
-await wait(4500)
-const after = await yawDiff()
-check(after < 1.0, `조작이 없으면 해녀 앞쪽으로 (해녀 정면과 ${after.toFixed(2)} rad)`)
-await jpeg(A, 'seat-8-camera-after-front')
-// 끌면 바로 멈춤
-const cx = 640
-await A.page.mouse.move(cx, 400)
-await A.page.mouse.down()
-await A.page.mouse.move(cx + 120, 410, { steps: 6 })
-await A.page.mouse.up()
-const dragged = await yawDiff()
-await wait(1500)
-check(Math.abs((await yawDiff()) - dragged) < 0.02, '끌고 난 뒤 바로는 자동으로 움직이지 않음 (제어권)')
-// 걸을 땐 등 뒤에서
-const occ2 = await seatsSeenBy(A)
-const far = [9, 10, 11, 8, 7].find((s) => !occ2.includes(s))
-await A.page.evaluate((s) => window.__sumbi.seat(s), far)
-await wait(3500)
-const behind = await yawDiff()
-check(Math.abs(behind - Math.PI) < 0.8, `걷는 동안 카메라는 등 뒤 (${behind.toFixed(2)} rad)`)
-await jpeg(A, 'seat-9-camera-walking-behind')
-await waitSeated(A, far, 20000)
-await wait(5500)
-check((await yawDiff()) < 1.0, '앉고 2.5초 뒤 다시 앞쪽으로')
-await jpeg(A, 'seat-10-camera-front-again')
-
 // ── 6) 걷는 중에 연결이 끊기면 목적지 자리가 빔 ──
 const occ3 = await seatsSeenBy(B)
 const dropSeat = [4, 6, 0, 1, 2, 5, 7].find((s) => !occ3.includes(s))
@@ -378,7 +326,9 @@ for (const w of [A, B, C, D]) {
   check(new Set(seats).size === seats.length, `${w.name} 화면: 마지막에도 자리 겹침 없음 (${seats.length}명)`)
 }
 
+// 정상 종료를 서버가 받을 때까지 기다림 (그냥 끝내면 비정상 끊김 → 20초 동안 자리를 잡고 있어 다음 실행이 어긋남)
 for (const f of fakes) f.ws.close(1000)
+await wait(800)
 await browser.close()
 console.log(failures.length ? `\n실패 ${failures.length}개:\n- ${failures.join('\n- ')}` : '\n모두 통과')
 process.exit(failures.length ? 1 : 0)
