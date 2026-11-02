@@ -436,7 +436,7 @@ frontend/
 ```json
 {
   "t": "welcome",
-  "you": { "id": 7, "nick": "몽글몽글한 돌고래", "token": "b3f1…", "look": { "towel": "pink", "tewak": "yellow", "cheek": "rose" } },
+  "you": { "id": 7, "nick": "몽글몽글한 돌고래", "token": "b3f1…", "look": { "towel": "pink", "tewak": "yellow", "cheek": "rose" }, "p": [2.1, 0, 10.3] },
   "room": { "id": "sea-3", "capacity": 50 },
   "players": [
     { "id": 2, "nick": "작은 소라", "look": { "towel": "sky", "tewak": "orange", "cheek": "peach" }, "zone": "sea", "p": [3.1, 0, -4.2], "r": 0.4, "st": "surface" },
@@ -445,6 +445,7 @@ frontend/
   "today": { "divers": 128, "items": { "conch": 342, "abalone": 97, "urchin": 210 } }
 }
 ```
+`you.p`: 서버가 정해 준 시작 위치(여럿이 겹치지 않게 시작점 주변에 흩어 놓음). 재접속이면 클라이언트는 지금 위치를 유지.
 `st`(현재 상태): `surface` | `underwater` | `sit` | `prep`(앉아서 손질 중) — 중간 입장자가 다른 사람의 모습을 맞추기 위한 값
 
 **join / leave**
@@ -522,7 +523,7 @@ frontend/
 ### 8.1 구성
 - Spring Boot 3, Java 21, `spring-boot-starter-websocket` (STOMP 없이 `TextWebSocketHandler`)
 - JSON: Jackson, 메시지는 `record` + `sealed interface`로 타입 정의
-- 동시성: 방마다 단일 스레드 작업 큐(방 안 상태는 그 스레드에서만 변경) → 락 없이 단순하게. 송신은 `ConcurrentWebSocketSessionDecorator`로 감싸 느린 클라이언트가 방을 막지 않게.
+- 동시성: 방(Room) 메서드를 `synchronized` 로 묶음 (3단계 구현. 방마다 단일 스레드 큐보다 단순하고 50명 규모엔 충분, 필요하면 나중에 교체). 송신은 `ConcurrentWebSocketSessionDecorator`로 감싸 느린 클라이언트가 방을 막지 않게.
 - 스케줄러: 방별 100ms 틱에 스냅샷 방송
 - 집계: 처음엔 메모리, 4단계에서 Redis (`INCR`, 키에 KST 날짜 포함, 48시간 TTL)
 
@@ -612,7 +613,11 @@ sumbi/
 - 프로토콜: `hello`에 `nick`·`look`, 클라이언트·서버 `look` 메시지 (오프라인 모드에서 흉내). 접속은 "바다로 들어가기"를 누를 때
 - 캡처: `docs/screenshots/customize/` (`node scripts/capture-customize.mjs <폴더>`)
 
-### 3단계 — 백엔드 멀티플레이
+### 3단계 — 백엔드 멀티플레이 ✅ 완료 (2026-11-02)
+- 결과: `docs/screenshots/stage3/` · 확인 스크립트 `frontend/scripts/capture-multiplayer.mjs` (브라우저 3개)
+- 실제 패키지: `catalog/`(닉네임·꾸미기 목록, 8.2의 nickname/ 대신), `game/GameServer`(입장·대기·재접속·주기 작업), `room/`, `player/`, `protocol/`, `stats/`, `admission/`, `ws/`, `web/`
+- 재접속: 탭 닫기(1000·1001)는 바로 퇴장, 그 외 끊김·heartbeat 만료는 20초 동안 자리를 지켜 같은 번호로 복귀. 토큰은 브라우저 저장
+- 남은 것: LOD(15m 밖 얼굴 숨기기), 부하 테스트 스크립트, Docker 구성(5단계)
 - Spring Boot 프로젝트, WebSocket 핸들러, 프로토콜 record
 - 방 배정(50명), 입·퇴장, 위치 스냅샷 방송, 행동 이벤트, 닉네임·꾸미기 검증(`hello`·`look`), 재접속 토큰
 - 프론트 `WsNetClient`: 송신 주기 제한, 원격 플레이어 보간, 재연결

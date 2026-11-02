@@ -70,8 +70,41 @@
 ### StrictMode에서 오프라인 접속이 두 번 일어남 (2026-11-02)
 - **해결**: `OfflineNetClient.connect()` 시작 때 기존 타이머 정리.
 
-### `/dev/character`에서 "synchronously unmount a root" 경고 (미해결, 영향 없음)
-- drei `Html` 라벨 + StrictMode에서 나는 개발용 경고. 수정 전에도 같은 15개. 게임 화면에는 없음.
+### `/dev/character`에서 "synchronously unmount a root" 콘솔 오류 15개 (2026-11-02 해결)
+- **증상**: 캐릭터 랩을 열면 React 콘솔 오류 15개 (라벨 수만큼).
+- **원인**: drei `Html` 은 자기 React 루트를 만든다. Canvas 가 처음 그려지는 중(바깥 React 가 렌더 중)에 라벨이 같이 마운트되면, StrictMode 의 가짜 해제가 "렌더 중 루트 해제"가 됨. 게임 화면 이름표는 나중에 마운트돼서 괜찮았음.
+- **해결**: 라벨을 첫 프레임 뒤에 붙임 (`labelReady` 상태, `useFrame` 에서 true).
+- **확인**: Playwright 로 `/dev/character` 열고 콘솔 오류 0개.
 
 ### macOS에 `timeout`, Python PIL 없음
 - 여러 캡처를 한 장으로 보기: Playwright로 HTML 그리드를 띄워 스크린샷. 이미지 변환은 `sips -s format jpeg`.
+
+## 멀티플레이 (3단계)
+
+### 서버를 끄는 명령이 브라우저까지 죽임 (2026-11-02)
+- **증상**: 재접속 테스트에서 서버를 끄자 페이지가 처음 상태(selfId 없음)로 돌아가 재접속을 확인할 수 없었음.
+- **원인**: `kill $(lsof -ti tcp:8080)` 이 8080 에 **연결된** Chrome 프로세스까지 골라 죽임.
+- **해결**: 듣고 있는 서버만: `lsof -ti tcp:8080 -sTCP:LISTEN`.
+- **확인**: 서버를 껐다 켜면 "연결이 잠깐 끊겼어요" 표시 → 자동으로 online.
+
+### 다른 해녀 이름표가 너무 작거나, 가까이 있으면 화면을 덮음 (2026-11-02)
+- **원인**: drei `Html distanceFactor` 는 거리에 정비례로 줄임 → 8m 밖 이름은 8px 정도, 카메라 바로 옆이면 거대.
+- **해결**: `distanceFactor` 대신 `useFrame` 에서 카메라 거리로 직접 크기를 정하고 0.85~1.15배로 제한 (`ui/NameTag.tsx`). CSS 의 `translateY(-50%)` 도 같이 넣어야 위치가 안 틀어짐.
+- **확인**: `capture-multiplayer.mjs` 의 `mp-1-*`.
+
+### 백엔드 테스트: `List.of(...).contains(null)` 이 예외 (2026-11-02)
+- **증상**: 색이 빠진 `look`(null)을 검증하다 NullPointerException.
+- **원인**: `List.of` 로 만든 불변 목록은 null 을 찾기만 해도 예외.
+- **해결**: `in(list, value)` 도우미로 null 먼저 확인 (`CustomizeCatalog`).
+
+### 백엔드 테스트: 초당 메시지 제한이 다음 초에도 풀리지 않음 (2026-11-02)
+- **원인**: 창 시작값을 `Long.MIN_VALUE` 로 두어 `now - windowStart` 가 넘침(음수) → 창이 한 번도 안 바뀜.
+- **해결**: `started` 플래그로 첫 메시지에 창 시작 (`RateLimiter`).
+- **확인**: `RateLimiterTest`.
+
+### 원격 해녀가 떠오를 때 퐁 튀어오름이 안 나옴 (2026-11-02, 미리 막음)
+- **원인**: 해녀 모델은 "직전 상태가 ascending 이었을 때" 퐁을 재생하는데, `surface` 이벤트에서 바로 수면 대기로 바꾸면 ascending 을 건너뜀.
+- **해결**: `surface` 이벤트는 ascending 으로만 바꾸고, 다음 프레임에 `drivePose` 가 수면 대기로 (`net/remotes.ts`).
+
+### Spring Boot 실행 시 Java 버전
+- 이 컴퓨터 기본 Java 는 23. 백엔드는 Java 21 툴체인: `JAVA_HOME=$(/usr/libexec/java_home -v 21)` (`dev.sh` 는 자동으로 찾음).
