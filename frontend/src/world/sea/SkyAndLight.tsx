@@ -1,25 +1,29 @@
-import { Sky } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
-import { Color, DirectionalLight, Fog, Group, Object3D, Vector3 } from 'three'
+import { AmbientLight, Color, DirectionalLight, Fog, HemisphereLight, Object3D, Vector3 } from 'three'
 import { audio } from '../../audio/AudioEngine'
 import { player } from '../../player/runtime'
 import { useGame } from '../../store/gameStore'
+import { env } from '../time/env'
+import { TimeOfDay } from '../time/TimeOfDay'
 import { waveHeight } from './waves'
 
-// 따뜻한 오후 햇빛. 레퍼런스처럼 환경광 비중을 크게, 그림자는 부드럽고 연하게.
+// 하늘·빛·안개. 색과 방향은 시간대(env)를 따름. 환경광 비중을 크게, 그림자는 부드럽고 연하게.
+
+/** 낮 기준 해 방향 (물속 빛줄기 기울기용 고정값) */
 export const SUN_DIR = new Vector3(-0.45, 0.42, -0.78).normalize()
 
-const ABOVE = { color: new Color('#cfe0e8'), near: 70, far: 1300 }
-const BELOW = { color: new Color('#1d6a80'), near: 0.5, far: 26 }
+const ABOVE = { near: 70, far: 1300 }
+const BELOW = { near: 0.5, far: 26 }
 
 export function SkyAndLight() {
   const { scene, camera } = useThree()
   const sun = useRef<DirectionalLight>(null!)
+  const hemi = useRef<HemisphereLight>(null!)
+  const ambient = useRef<AmbientLight>(null!)
   const target = useRef(new Object3D())
-  const sky = useRef<Group>(null!)
-  const fog = useRef(new Fog(ABOVE.color.clone(), ABOVE.near, ABOVE.far))
-  const background = useRef(ABOVE.color.clone())
+  const fog = useRef(new Fog(env.horizon.clone(), ABOVE.near, ABOVE.far))
+  const background = useRef(new Color())
 
   useEffect(() => {
     scene.fog = fog.current
@@ -32,16 +36,15 @@ export function SkyAndLight() {
   }, [scene])
 
   useFrame(({ clock }) => {
-    // 카메라가 물속인지 판정 → 안개·하늘·소리 전환
+    // 카메라가 물속인지 판정 → 안개·배경·소리 전환
     const under = camera.position.y < waveHeight(camera.position.x, camera.position.z, clock.elapsedTime) - 0.05
     const f = fog.current
-    const mode = under ? BELOW : ABOVE
-    f.color.copy(mode.color)
-    f.near = mode.near
-    f.far = mode.far
-    background.current.copy(mode.color)
+    f.color.copy(under ? env.underFog : env.horizon)
+    f.near = under ? BELOW.near : ABOVE.near
+    // 밤에는 물속이 더 어둡고 가까이만 보임
+    f.far = under ? BELOW.far * (1 - 0.3 * env.night) : ABOVE.far
+    background.current.copy(f.color)
     scene.background = background.current
-    sky.current.visible = !under
 
     const game = useGame.getState()
     if (game.cameraUnderwater !== under) {
@@ -49,26 +52,26 @@ export function SkyAndLight() {
       audio.setUnderwater(under)
     }
 
+    // 시간대 빛
+    sun.current.color.copy(env.light)
+    sun.current.intensity = env.lightI
+    hemi.current.color.copy(env.hemiSky)
+    hemi.current.groundColor.copy(env.hemiGround)
+    hemi.current.intensity = env.hemiI
+    ambient.current.intensity = env.ambientI
+
     // 그림자 영역이 내 해녀를 따라다니게
     const p = player.pos
-    sun.current.position.set(p.x + SUN_DIR.x * 40, SUN_DIR.y * 40, p.z + SUN_DIR.z * 40)
+    const d = env.lightDir
+    sun.current.position.set(p.x + d.x * 40, d.y * 40, p.z + d.z * 40)
     target.current.position.set(p.x, 0, p.z)
   })
 
   return (
     <>
-      <group ref={sky}>
-        <Sky
-          distance={4500}
-          sunPosition={SUN_DIR.clone().multiplyScalar(100).toArray()}
-          turbidity={5}
-          rayleigh={1.1}
-          mieCoefficient={0.004}
-          mieDirectionalG={0.82}
-        />
-      </group>
-      <hemisphereLight args={['#dcefff', '#c9b48f', 1.35]} />
-      <ambientLight intensity={0.25} color="#fff4e6" />
+      <TimeOfDay />
+      <hemisphereLight ref={hemi} args={['#dcefff', '#c9b48f', 1.35]} />
+      <ambientLight ref={ambient} intensity={0.25} color="#fff4e6" />
       <directionalLight
         ref={sun}
         color="#ffe2bd"

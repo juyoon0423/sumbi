@@ -2,7 +2,7 @@ import { useFrame } from '@react-three/fiber'
 import { useMemo } from 'react'
 import { Color, DoubleSide, ShaderMaterial, UniformsLib, UniformsUtils, Vector3 } from 'three'
 import { INNER_OCEAN_RADIUS, WAVE_GLSL } from './waves'
-import { SUN_DIR } from './SkyAndLight'
+import { env } from '../time/env'
 
 // 수면: 가운데(파도 있음, 촘촘한 격자) + 바깥 고리(평평, 수평선까지)
 // 위에서 보면 푸른 바다 + 하늘 반사 + 햇빛 반짝임, 아래에서 보면 밝게 빛나는 수면(스넬의 창)
@@ -36,6 +36,7 @@ const fragmentShader = /* glsl */ `
   uniform vec3 uShallow;
   uniform vec3 uSky;
   uniform vec3 uSun;
+  uniform float uGlintPow;
   uniform vec3 uUnderDark;
   uniform vec3 uUnderBright;
   varying vec3 vWorld;
@@ -56,8 +57,8 @@ const fragmentShader = /* glsl */ `
       vec3 water = mix(uDeep, uShallow, smoothstep(-0.05, 0.22, vHeight) * 0.6 + 0.15);
       col = mix(water, uSky, clamp(fresnel * 0.9, 0.0, 1.0));
       vec3 r = reflect(-uSunDir, n);
-      float spec = pow(max(dot(r, v), 0.0), 180.0);
-      col += uSun * spec * 0.9;
+      float spec = pow(max(dot(r, v), 0.0), uGlintPow);
+      col += uSun * spec;
     } else {
       // 물속에서 올려다본 수면
       vec3 nn = -n;
@@ -89,6 +90,7 @@ function makeMaterial(clipRadius: number) {
         uShallow: { value: new Color('#2a9aa3') },
         uSky: { value: new Color('#bfdcea') },
         uSun: { value: new Color('#fff1d6') },
+        uGlintPow: { value: 180 },
         uUnderDark: { value: new Color('#145d70') },
         uUnderBright: { value: new Color('#bff3fb') },
       },
@@ -100,13 +102,23 @@ export function Ocean() {
   const [inner, outer] = useMemo(() => {
     const a = makeMaterial(INNER_OCEAN_RADIUS)
     const b = makeMaterial(0)
-    for (const m of [a, b]) m.uniforms.uSunDir.value.copy(SUN_DIR)
     return [a, b]
   }, [])
 
   useFrame(({ clock }) => {
-    inner.uniforms.uTime.value = clock.elapsedTime
-    outer.uniforms.uTime.value = clock.elapsedTime
+    for (const m of [inner, outer]) {
+      const u = m.uniforms
+      u.uTime.value = clock.elapsedTime
+      // 시간대: 물빛·하늘 반사·해(밤엔 달) 반짝임
+      u.uSunDir.value.copy(env.lightDir)
+      u.uDeep.value.copy(env.deep)
+      u.uShallow.value.copy(env.shallow)
+      u.uSky.value.copy(env.reflect)
+      u.uSun.value.copy(env.glint).multiplyScalar(env.glintI)
+      u.uGlintPow.value = env.glintPow
+      u.uUnderDark.value.copy(env.underDark)
+      u.uUnderBright.value.copy(env.underBright)
+    }
   })
 
   return (
