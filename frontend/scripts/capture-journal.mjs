@@ -39,7 +39,7 @@ const shot = async (page, file) => {
   await page.screenshot({ path: join(out, `${file}.png`) })
   console.log('saved', file)
 }
-/** 이번 물질을 23분째인 것처럼 + 딴 것·손질한 것·숨 고르기 */
+/** 이번 물질을 23분째인 것처럼 + 딴 것·손질한 것 */
 const fakeSession = (page) =>
   page.evaluate(() => {
     const s = window.__sumbi.session
@@ -47,7 +47,6 @@ const fakeSession = (page) =>
       startedAt: Date.now() - 23 * 60_000 - 20_000,
       harvested: { conch: 3, abalone: 1, urchin: 2 },
       prepped: { conch: 1, abalone: 0, urchin: 1 },
-      breaths: 3,
     })
   })
 

@@ -13,7 +13,6 @@ export interface JournalEntry {
   harvested: ItemCounts
   prepped: ItemCounts
   met: number
-  breaths: number
   preset: TimePreset
   nick: string
 }
@@ -132,7 +131,6 @@ export function drawCard(entry: JournalEntry, photo: HTMLCanvasElement | null, f
     ['손질한 것', total(entry.prepped) > 0 ? list(entry.prepped) : '—'],
     ['함께한 해녀', entry.met > 0 ? `${entry.met}명` : '혼자 조용히'],
   ]
-  if (entry.breaths > 0) rows.splice(3, 0, ['숨 고르기', `${entry.breaths}번`])
   y += 34
   const rowH = rows.length > 4 ? 66 : 76
   for (const [k, v] of rows) {

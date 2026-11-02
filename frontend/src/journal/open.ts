@@ -1,4 +1,3 @@
-import { stopBreathe } from '../player/breathe'
 import { useJournal } from '../store/journalStore'
 import { currentEntry, makeCard, saveEntry } from './journal'
 
@@ -6,7 +5,6 @@ import { currentEntry, makeCard, saveEntry } from './journal'
 export async function openJournal() {
   const j = useJournal.getState()
   if (j.open) return
-  stopBreathe()
   const entry = currentEntry()
   saveEntry(entry)
   j.show(entry)

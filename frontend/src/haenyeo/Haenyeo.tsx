@@ -10,7 +10,7 @@ import { MAT } from './materials'
 import { TOOL_GEO, TOOL_MAT } from './tools'
 import { WALK } from '../world/bulteok/seatWalk'
 import { OOPS_DURATION } from './acts'
-import { breatheAmount, LAND_STATES, type HaenyeoPose } from './types'
+import { LAND_STATES, type HaenyeoPose } from './types'
 
 // 기본 도형으로 조합한 2~2.5등신 해녀 + 절차적 애니메이션.
 // 원점 = 몸 중심, 앞 = +z. 전체 키 ≈ 1.15, 머리 높이 ≈ 0.6 (약 절반)
@@ -74,8 +74,6 @@ interface Anim extends Target {
   /** 양팔 따로 움직이기: 현재 각도와 섞는 비율 */
   arms: Arms
   armsW: number
-  /** 숨 고르기로 부푼 정도 */
-  breathe: number
 }
 
 /** 불턱에서 앉아서 하는 동작 (손질 3종·귤 까먹기·졸기). 양팔을 따로 쓰면 그 각도를 돌려줌 */
@@ -172,13 +170,12 @@ function idleGesture(a: Anim, tg: Target, face: Face) {
   if (a.gesture === 'hug') face.eyes = hump(g) > 0.3 ? 'happy' : 'dot'
 }
 
-function computeTarget(pose: HaenyeoPose, a: Anim, t: number): { tg: Target; face: Face; arms: Arms | null; breathe: number } {
+function computeTarget(pose: HaenyeoPose, a: Anim, t: number): { tg: Target; face: Face; arms: Arms | null } {
   const st = pose.stateTime
   const lowBreath = pose.breath < CONFIG.lowBreath
   const face: Face = { eyes: 'dot', mouth: 'dot', sweat: false }
   let tg: Target = { ...BASE }
   let arms: Arms | null = null
-  let breathe = 0
 
   switch (pose.state) {
     case 'surfaceIdle': {
@@ -331,18 +328,6 @@ function computeTarget(pose: HaenyeoPose, a: Anim, t: number): { tg: Target; fac
     }
   }
 
-  // 숨 고르기: 테왁을 끌어안고 눈을 감은 채 4초 들이쉬고 6초 내쉬기
-  if (pose.breatheTime >= 0 && (pose.state === 'surfaceIdle' || pose.state === 'surfaceSwim')) {
-    breathe = breatheAmount(pose.breatheTime, CONFIG.breatheIn, CONFIG.breatheOut)
-    tg.armX = -1.35
-    tg.armZ = -0.62
-    tg.headTilt = 0.05 - 0.2 * breathe
-    tg.headYaw = 0
-    tg.headRoll = 0
-    tg.cheeks = 0.3 * breathe
-    face.eyes = 'line'
-  }
-
   // 대야가 가득 참: 다 같이 두 팔 번쩍 만세
   if (pose.celebrateTime >= 0) {
     const ct = pose.celebrateTime
@@ -383,7 +368,7 @@ function computeTarget(pose: HaenyeoPose, a: Anim, t: number): { tg: Target; fac
     face.mouth = 'smile'
   }
 
-  return { tg, face, arms, breathe }
+  return { tg, face, arms }
 }
 
 const handTmp = new Vector3()
@@ -447,7 +432,6 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
     nextBlink: 1 + look.phase * 3,
     arms: { lx: -1.15, lz: -0.35, rx: -1.15, rz: 0.35 },
     armsW: 0,
-    breathe: 0,
   })
 
   /** 불턱 소품: 손 위치(팔 각도)에 맞춰 보이기·움직이기 */
@@ -555,7 +539,7 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
     a.happyT = Math.max(0, a.happyT - dt)
 
     // 대기 몸짓 스케줄
-    if ((pose.state === 'surfaceIdle' && pose.breatheTime < 0) || (pose.state === 'sit' && !pose.act) || pose.state === 'stand') {
+    if (pose.state === 'surfaceIdle' || (pose.state === 'sit' && !pose.act) || pose.state === 'stand') {
       if (a.gesture) {
         a.gestureT += dt
         if (a.gestureT > 1.6) a.gesture = null
@@ -567,7 +551,7 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
       }
     }
 
-    const { tg, face, arms, breathe } = computeTarget(pose, a, t)
+    const { tg, face, arms } = computeTarget(pose, a, t)
     const k = damp(8, dt)
     const lerpKeys: (keyof Target)[] = [
       'roll', 'headTilt', 'headYaw', 'headRoll', 'armX', 'armZ', 'kickAmp', 'kickFreq', 'frog', 'stretch', 'sit',
@@ -579,7 +563,6 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
     a.goggles += (tg.goggles - a.goggles) * damp(9, dt)
     a.cheeks += (tg.cheeks - a.cheeks) * damp(10, dt)
     a.kickPhase += dt * a.kickFreq * (0.6 + pose.move * 0.6)
-    a.breathe += (breathe - a.breathe) * damp(6, dt)
     // 양팔 따로: 목표 각도로 빠르게, 끝나면 평소 자세로 부드럽게 돌아옴
     if (arms) {
       const ka = damp(14, dt)
@@ -631,9 +614,7 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
       stretch *= 1 + 0.05 * hump(o)
     }
     pop.current.position.y = popY + (LAND_STATES.has(pose.state) ? 0 : Math.sin(t * 2.2) * 0.012)
-    // 숨 고르기: 들이쉬면 몸이 동그랗게 부풀고 내쉬면 가라앉음
-    stretch *= 1 + 0.045 * a.breathe
-    const side = (1 / Math.sqrt(stretch)) * (1 + 0.07 * a.breathe)
+    const side = 1 / Math.sqrt(stretch)
     squash.current.scale.set(side, stretch, side)
 
     body.current.rotation.set(a.pitch, 0, a.roll)

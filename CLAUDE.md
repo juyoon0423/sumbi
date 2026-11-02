@@ -24,7 +24,7 @@ cd frontend && npm run build && npm run lint  # 타입 검사 + 빌드, oxlint
 
 - **화면이 바뀌는 작업은 Playwright로 직접 캡처해서 눈으로 확인**한다 (개발 서버를 켠 상태에서).
   - `npm run capture` (게임·캐릭터 랩) · `node scripts/capture-dive.mjs <폴더>` (잠수 연속) · `node scripts/capture-customize.mjs <폴더>` (꾸미기) · `node scripts/capture-multiplayer.mjs <폴더>` (브라우저 3개 멀티플레이, 백엔드 필요)
-  - 4단계: `capture-bulteok.mjs` (불턱 손질·대야, 백엔드를 `SUMBI_BASIN_CAPACITY=6` 으로) · `capture-breathe.mjs` (숨 고르기) · `capture-time.mjs` (시간대, 백엔드 없어도 됨) · `capture-journal.mjs` (물질 일지)
+  - 4단계: `capture-bulteok.mjs` (불턱 손질·대야, 백엔드를 `SUMBI_BASIN_CAPACITY=6` 으로) · `capture-time.mjs` (시간대, 백엔드 없어도 됨) · `capture-journal.mjs` (물질 일지)
   - 불턱 자리 옮기기: `capture-bulteok-seat.mjs <폴더> [원본프레임폴더]` (백엔드 필요, 가짜 WebSocket 해녀로 24자리를 채움)
   - 설치된 Chrome을 씀 (`channel: 'chrome'`). 확정 캡처는 `docs/screenshots/<주제>/`에 JPEG로 저장 (용량 줄이기).
 - **단계(또는 의미 있는 작업)가 끝날 때마다**: 비밀 정보 점검(API 키·비밀번호·토큰·`.env`·키 파일) → 의미 있는 단위로 커밋 → `main`에 push.

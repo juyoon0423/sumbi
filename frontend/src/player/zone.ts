@@ -8,7 +8,6 @@ import { useBubbles } from '../store/bubbleStore'
 import { restingTewak, seatPose } from '../world/bulteok/layout'
 import { beginSeatWalk, startOops } from '../world/bulteok/seatMotion'
 import { walkDuration } from '../world/bulteok/seatWalk'
-import { stopBreathe } from './breathe'
 import { cameraRig, player } from './runtime'
 
 // 바다 ↔ 불턱 이동: 화면을 부드럽게 가렸다가(페이드) 서버가 자리를 정해 주면 옮기고 다시 밝힘
@@ -20,7 +19,6 @@ export function travel(to: Zone) {
   const game = useGame.getState()
   if (b.traveling || b.zone === to) return
   if (to === 'bulteok' && (game.diving || player.pose.state !== 'surfaceIdle' && player.pose.state !== 'surfaceSwim')) return
-  stopBreathe()
   b.setTraveling(to)
   window.setTimeout(() => net.send({ t: 'zone', to }), FADE_MS)
   // 서버가 답하지 않으면 원래대로
@@ -45,7 +43,6 @@ export function enterBulteokLocal(seat: number) {
   const pose = player.pose
   setState(pose, seat >= 24 ? 'stand' : 'sit')
   pose.act = null
-  pose.breatheTime = -1
   pose.heldItem = null
   player.breath = 1
   const tw = restingTewak(seat)

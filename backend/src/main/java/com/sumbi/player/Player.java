@@ -26,8 +26,6 @@ public class Player {
     public boolean dozing;
     /** 자리를 옮겨 걸어가는 중이면 앉기까지 끝나는 시각 (ms). 목적지 자리는 seat 에 이미 잡혀 있음 */
     public long walkUntil;
-    /** 수면에서 숨 고르기 중 */
-    public boolean breathing;
     public long lastZoneAt;
     /** 마지막 위치 갱신 시각 (ms). 0이면 아직 클라이언트가 위치를 안 보냄 */
     public long lastMoveAt;
@@ -62,7 +60,7 @@ public class Player {
         if (inBulteok()) {
             return new PlayerInfo(id, nick.display(), look, zone, null, round(yaw), seat, dozing ? "doze" : "sit");
         }
-        return new PlayerInfo(id, nick.display(), look, zone, round(pos), round(yaw), null, breathing ? "breathe" : status);
+        return new PlayerInfo(id, nick.display(), look, zone, round(pos), round(yaw), null, status);
     }
 
     public static double round(double v) {

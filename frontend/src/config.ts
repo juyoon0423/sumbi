@@ -30,12 +30,6 @@ export const CONFIG = {
   tangerineDuration: 4.0,
   celebrateDuration: 3.2, // 대야가 가득 찼을 때 만세
 
-  // 숨 고르기 (4초 들이쉬고 6초 내쉬기)
-  breatheIn: 4,
-  breatheOut: 6,
-  breatheRewardCycles: 3, // 이만큼 하면 그날 숨 최대치 +breatheBonus 초
-  breatheBonus: 2,
-  breatheBonusMax: 6,
 
   // 채집
   harvestRadius: 1.0,

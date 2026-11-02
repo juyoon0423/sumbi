@@ -1,7 +1,7 @@
 import { CONFIG, type ItemType } from '../config'
 import type { HaenyeoPose, SitAct } from './types'
 
-// 불턱 동작(손질·귤·졸기)·만세·숨 고르기 시간 진행. 내 해녀와 다른 해녀가 같이 쓴다.
+// 불턱 동작(손질·귤·졸기)·만세·"앗" 시간 진행. 내 해녀와 다른 해녀가 같이 쓴다.
 
 /** 한 프레임 동안 일어난 순간 (소리·대야로 던지기) */
 export type ActEvent = 'tap' | 'pop' | 'crack' | 'toss' | 'munch'
@@ -28,7 +28,6 @@ export function advanceActs(pose: HaenyeoPose, dt: number): ActEvent[] {
     pose.celebrateTime += dt
     if (pose.celebrateTime > CONFIG.celebrateDuration) pose.celebrateTime = -1
   }
-  if (pose.breatheTime >= 0) pose.breatheTime += dt
   if (pose.oopsTime >= 0) {
     pose.oopsTime += dt
     if (pose.oopsTime > OOPS_DURATION) pose.oopsTime = -1

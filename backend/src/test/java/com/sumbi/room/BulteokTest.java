@@ -157,23 +157,20 @@ class BulteokTest {
         RecordingSink other = join(r, "token-oooo");
         join(r, "token-aaaa");
         assertThat(r.act(2, "tangerine", null, now)).isFalse(); // 바다에서 귤 X
-        assertThat(r.act(2, "breathe", null, now)).isTrue();
-        assertThat(r.get(2).info().st()).isEqualTo("breathe");
-        assertThat(r.act(2, "breathe", null, now)).isFalse(); // 이미 숨 고르는 중
+        assertThat(r.act(2, "breathe", null, now)).isFalse(); // 없어진 행동(숨 고르기)은 무시
         r.act(2, "dive", null, now);
-        assertThat(r.get(2).breathing).isFalse();
+        assertThat(r.get(2).info().st()).isEqualTo("underwater");
         r.act(2, "surface", null, now);
 
         now += 1000;
         r.changeZone(2, "bulteok", now);
-        assertThat(r.act(2, "breathe", null, now)).isFalse(); // 불턱에서 숨 고르기 X
         assertThat(r.act(2, "doze", null, now)).isTrue();
         assertThat(r.get(2).info().st()).isEqualTo("doze");
         assertThat(r.act(2, "wake", null, now)).isTrue();
         assertThat(r.act(2, "tangerine", null, now)).isTrue();
         assertThat(r.act(2, "tangerine", null, now + 1000)).isFalse(); // 아직 먹는 중
         assertThat(other.of(ServerMessage.Evt.class)).extracting(ServerMessage.Evt::a)
-            .containsExactly("breathe", "dive", "surface", "doze", "wake", "tangerine");
+            .containsExactly("dive", "surface", "doze", "wake", "tangerine");
     }
 
     @Test

@@ -61,7 +61,6 @@ function makeRuntime(p: PlayerInfo): RemoteRuntime {
   const pose = createPose()
   const underwater = p.st === 'underwater'
   if (underwater) setState(pose, 'underIdle')
-  if (p.st === 'breathe') pose.breatheTime = 0
   const yaw = p.r ?? 0
   const rm: RemoteRuntime = {
     id: p.id,
@@ -88,7 +87,6 @@ function setRemoteZone(rm: RemoteRuntime, zone: Zone, seat?: number, p?: Vec3) {
   rm.zone = zone
   const pose = rm.pose
   pose.act = null
-  pose.breatheTime = -1
   rm.walk = null
   if (zone === 'bulteok') {
     rm.seat = seat ?? 0
@@ -216,8 +214,7 @@ export function applyEvent(id: number, a: string, item?: ItemType) {
   const pose = rm.pose
   switch (a) {
     case 'dive':
-      pose.breatheTime = -1
-      rm.underwater = true
+          rm.underwater = true
       rm.tewak.attached = false // 테왁은 수면에 남김
       setState(pose, 'entering')
       fx.splashes.push({ pos: rm.pos.clone(), power: 1.6 })
@@ -238,12 +235,6 @@ export function applyEvent(id: number, a: string, item?: ItemType) {
       break
     case 'wave':
       pose.waveTime = 0
-      break
-    case 'breathe':
-      pose.breatheTime = 0
-      break
-    case 'breathe_end':
-      pose.breatheTime = -1
       break
     case 'tangerine':
       startAct(pose, 'tangerine')

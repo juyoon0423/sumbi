@@ -2,7 +2,6 @@ import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import type { Group } from 'three'
 import { advanceActs } from '../../haenyeo/acts'
-import { BreatheGlow } from '../../haenyeo/BreatheGlow'
 import { Haenyeo } from '../../haenyeo/Haenyeo'
 import { lookFromCustom } from '../../haenyeo/look'
 import { Tewak } from '../../haenyeo/Tewak'
@@ -48,7 +47,6 @@ function RemoteHaenyeo({ info }: { info: RemoteInfo }) {
     <>
       <group ref={root} position={rm.pos.toArray()}>
         <Haenyeo pose={rm.pose} look={look} />
-        <BreatheGlow pose={rm.pose} />
         <NameTag nick={info.nick} />
       </group>
       <Tewak state={rm.tewak} material={look.tewak} />

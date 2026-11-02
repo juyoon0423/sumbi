@@ -25,7 +25,7 @@ import java.util.function.Function;
  */
 public class Room {
     /** 바다에서 할 수 있는 행동 */
-    private static final Set<String> SEA_ACTIONS = Set.of("dive", "surface", "sumbi", "wave", "harvest", "breathe", "breathe_end");
+    private static final Set<String> SEA_ACTIONS = Set.of("dive", "surface", "sumbi", "wave", "harvest");
     /** 불턱에서 할 수 있는 행동 */
     private static final Set<String> BULTEOK_ACTIONS = Set.of("wave", "tangerine", "doze", "wake");
 
@@ -191,7 +191,7 @@ public class Room {
 
     /**
      * 행동: 즉시 다른 사람들에게 evt 방송. 받아들였으면 true (채집이면 오늘의 집계에 더함).
-     * 채집은 바다 물속에서만, 1인당 harvestIntervalMs 간격. 쉬기 동작은 불턱에서만, 숨 고르기는 수면에서만.
+     * 채집은 바다 물속에서만, 1인당 harvestIntervalMs 간격. 쉬기 동작은 불턱에서만.
      */
     public synchronized boolean act(int id, String action, String item, long now) {
         Player p = players.get(id);
@@ -199,24 +199,13 @@ public class Room {
         boolean bulteok = p.inBulteok();
         if (!(bulteok ? BULTEOK_ACTIONS : SEA_ACTIONS).contains(action)) return false;
         switch (action) {
-            case "dive" -> {
-                p.status = "underwater";
-                p.breathing = false;
-            }
+            case "dive" -> p.status = "underwater";
             case "surface" -> p.status = "surface";
             case "harvest" -> {
                 if (!"underwater".equals(p.status) || item == null || !CustomizeCatalog.ITEMS.contains(item)) return false;
                 if (now - p.lastHarvestAt < settings.harvestIntervalMs()) return false;
                 p.lastHarvestAt = now;
                 ledger.addHarvest(p.token, item);
-            }
-            case "breathe" -> {
-                if (!"surface".equals(p.status) || p.breathing) return false;
-                p.breathing = true;
-            }
-            case "breathe_end" -> {
-                if (!p.breathing) return false;
-                p.breathing = false;
             }
             case "tangerine" -> {
                 if (now < p.prepUntil || now < p.restUntil || now < p.walkUntil) return false;
@@ -248,7 +237,6 @@ public class Room {
             if (p.inBulteok() || !"surface".equals(p.status)) return false;
             p.zone = "bulteok";
             p.seat = freeSeat();
-            p.breathing = false;
             p.dozing = false;
             p.moved = false;
             p.lastZoneAt = now;
