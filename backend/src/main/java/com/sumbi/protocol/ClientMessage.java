@@ -12,6 +12,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
     @JsonSubTypes.Type(value = ClientMessage.Act.class, name = "act"),
     @JsonSubTypes.Type(value = ClientMessage.Zone.class, name = "zone"),
     @JsonSubTypes.Type(value = ClientMessage.Prep.class, name = "prep"),
+    @JsonSubTypes.Type(value = ClientMessage.Seat.class, name = "seat"),
     @JsonSubTypes.Type(value = ClientMessage.Ping.class, name = "ping"),
 })
 public sealed interface ClientMessage {
@@ -28,6 +29,9 @@ public sealed interface ClientMessage {
 
     /** 불턱에서 손질 시작. how: tap(기본) */
     record Prep(String item, String how) implements ClientMessage {}
+
+    /** 불턱에서 이 자리로 옮겨 앉고 싶음 (서버가 승인하면 seat 방송) */
+    record Seat(Integer seat) implements ClientMessage {}
 
     record Ping(long ts) implements ClientMessage {}
 }

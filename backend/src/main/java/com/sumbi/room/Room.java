@@ -134,10 +134,16 @@ public class Room {
 
     /** 연결이 잠깐 끊김: 방에는 남겨 두고(다른 사람에겐 멈춰 보임) 유예 시간 뒤 정리 */
     public synchronized void detach(int id, long until) {
+        detach(id, 0, until);
+    }
+
+    /** 자리를 옮겨 걷는 중에 끊기면 목적지 자리를 비우고 바다로 (돌아오면 바다에서 시작) */
+    public synchronized void detach(int id, long now, long until) {
         Player p = players.get(id);
         if (p == null) return;
         p.sink = null;
         p.detachedUntil = until;
+        if (p.inBulteok() && now < p.walkUntil) leaveBulteok(p, now);
     }
 
     /** 같은 토큰으로 돌아옴 */
@@ -213,12 +219,12 @@ public class Room {
                 p.breathing = false;
             }
             case "tangerine" -> {
-                if (now < p.prepUntil || now < p.restUntil) return false;
+                if (now < p.prepUntil || now < p.restUntil || now < p.walkUntil) return false;
                 p.restUntil = now + settings.restMs();
                 p.dozing = false;
             }
             case "doze" -> {
-                if (now < p.prepUntil || p.dozing) return false;
+                if (now < p.prepUntil || p.dozing || now < p.walkUntil) return false;
                 p.dozing = true;
             }
             case "wake" -> {
@@ -253,21 +259,50 @@ public class Room {
         }
         if ("sea".equals(to)) {
             if (!p.inBulteok()) return false;
-            p.zone = "sea";
-            p.seat = -1;
-            p.status = "surface";
-            p.dozing = false;
-            p.prepUntil = 0;
-            p.restUntil = 0;
-            double[] back = seaReturn(id);
-            System.arraycopy(back, 0, p.pos, 0, 3);
-            p.yaw = Math.PI; // 바다 쪽을 보며
-            p.lastMoveAt = 0; // 다음 위치는 거리 검사 없이
-            p.lastZoneAt = now;
-            broadcast(new ServerMessage.ZoneChanged(id, p.zone, null, Player.round(p.pos), null));
+            leaveBulteok(p, now);
             return true;
         }
         return false;
+    }
+
+    /** 불턱 → 바다 (자리를 비움). 모두에게 zone 방송 */
+    private void leaveBulteok(Player p, long now) {
+        p.zone = "sea";
+        p.seat = -1;
+        p.status = "surface";
+        p.dozing = false;
+        p.prepUntil = 0;
+        p.restUntil = 0;
+        p.walkUntil = 0;
+        double[] back = seaReturn(p.id);
+        System.arraycopy(back, 0, p.pos, 0, 3);
+        p.yaw = Math.PI; // 바다 쪽을 보며
+        p.lastMoveAt = 0; // 다음 위치는 거리 검사 없이
+        p.lastZoneAt = now;
+        broadcast(new ServerMessage.ZoneChanged(p.id, p.zone, null, Player.round(p.pos), null));
+    }
+
+    /**
+     * 불턱에서 다른 자리로 옮겨 앉기. 앉을 수 있는 자리(0~23)이고 아무도 없거나 가는 중이 아니면 승인:
+     * 원래 자리는 바로 비고 목적지는 걷는 동안에도 내 자리. 모두에게 seat(from → to) 방송.
+     * 이미 찬 자리면 본인에게만 seat_no. 손질·귤 까먹기 중엔 거절. 걷는 중에 다른 자리를 고르면 방향을 바꿈.
+     * 방 잠금 안에서 확인·배정하므로 같은 자리를 동시에 눌러도 먼저 온 요청만 승인됨.
+     */
+    public synchronized boolean requestSeat(int id, Integer seat, long now) {
+        Player p = players.get(id);
+        if (p == null || !p.inBulteok() || seat == null || seat == p.seat) return false;
+        boolean taken = false;
+        for (Player q : players.values()) if (q != p && q.inBulteok() && q.seat == seat) taken = true;
+        if (seat < 0 || seat >= SeatPath.RING_SEATS || taken || now < p.prepUntil || now < p.restUntil) {
+            p.send(new ServerMessage.SeatDenied(seat));
+            return false;
+        }
+        int from = p.seat;
+        p.seat = seat;
+        p.dozing = false;
+        p.walkUntil = now + SeatPath.walkMs(from, seat);
+        broadcast(new ServerMessage.SeatMove(id, from, seat));
+        return true;
     }
 
     /** 가장 작은 빈자리 (0~11 안쪽 원, 12~23 바깥 원, 그 뒤는 담 밖에서 서서) */
@@ -291,7 +326,7 @@ public class Room {
     public synchronized boolean prep(int id, String item, long now) {
         Player p = players.get(id);
         if (p == null || !p.inBulteok() || item == null || !CustomizeCatalog.ITEMS.contains(item)) return false;
-        if (now < p.prepUntil || now < p.restUntil) return false;
+        if (now < p.prepUntil || now < p.restUntil || now < p.walkUntil) return false;
         int left = ledger.tryPrep(p.token, item);
         if (left < 0) {
             p.send(new ServerMessage.Err("NO_ITEM", "harvest it in the sea first"));

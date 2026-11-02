@@ -19,6 +19,8 @@ import java.util.Map;
     @JsonSubTypes.Type(value = ServerMessage.ZoneChanged.class, name = "zone"),
     @JsonSubTypes.Type(value = ServerMessage.Prep.class, name = "prep"),
     @JsonSubTypes.Type(value = ServerMessage.Basin.class, name = "basin"),
+    @JsonSubTypes.Type(value = ServerMessage.SeatMove.class, name = "seat"),
+    @JsonSubTypes.Type(value = ServerMessage.SeatDenied.class, name = "seat_no"),
     @JsonSubTypes.Type(value = ServerMessage.Pong.class, name = "pong"),
     @JsonSubTypes.Type(value = ServerMessage.Err.class, name = "err"),
 })
@@ -61,6 +63,12 @@ public sealed interface ServerMessage {
 
     /** 공동 대야. full=true 면 다 같이 만세, 잠시 뒤 비운 대야(round+1) */
     record Basin(int fill, int capacity, int round, Boolean full) implements ServerMessage {}
+
+    /** 누군가 자리를 옮기기 시작함 (본인 포함). 각 화면이 from → to 같은 길을 걸어가는 모습을 재생 */
+    record SeatMove(int id, int from, int to) implements ServerMessage {}
+
+    /** 그 자리는 이미 누가 있거나 가는 중 (본인에게만) */
+    record SeatDenied(int seat) implements ServerMessage {}
 
     record Pong(long ts) implements ServerMessage {}
 

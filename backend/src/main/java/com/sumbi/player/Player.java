@@ -24,6 +24,8 @@ public class Player {
     /** 귤 까먹기 등 쉬기 동작이 끝나는 시각 (ms) */
     public long restUntil;
     public boolean dozing;
+    /** 자리를 옮겨 걸어가는 중이면 앉기까지 끝나는 시각 (ms). 목적지 자리는 seat 에 이미 잡혀 있음 */
+    public long walkUntil;
     /** 수면에서 숨 고르기 중 */
     public boolean breathing;
     public long lastZoneAt;

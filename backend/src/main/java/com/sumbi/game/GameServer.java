@@ -101,6 +101,9 @@ public class GameServer {
             case ClientMessage.Prep prep -> {
                 if (s.player != null) s.room.prep(s.player.id, prep.item(), now);
             }
+            case ClientMessage.Seat seat -> {
+                if (s.player != null) s.room.requestSeat(s.player.id, seat.seat(), now);
+            }
         }
     }
 
@@ -118,7 +121,7 @@ public class GameServer {
         reservations.put(p.token, new Reservation(room.id, p.id, now + props.reconnectGraceMs()));
         if (abnormal) {
             // 잠깐 끊김: 유예 시간 동안 자리를 지켜 둠 (다른 사람에겐 잠시 멈춘 것처럼 보임)
-            room.detach(p.id, now + props.reconnectGraceMs());
+            room.detach(p.id, now, now + props.reconnectGraceMs());
         } else {
             room.remove(p.id);
             rooms.removeIfEmpty(room);
