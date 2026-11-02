@@ -23,7 +23,8 @@ function loadBasket(): ItemCounts {
 interface GameState {
   phase: Phase
   selfId: number | null
-  nickname: string
+  /** 바다 속에서 꾸미기 메뉴를 연 상태 (이동·잠수 입력 막음) */
+  customizing: boolean
   basket: ItemCounts
   today: TodayStats | null
   /** 카메라가 물속인지 (안개·소리·화면 효과 전환용) */
@@ -32,7 +33,8 @@ interface GameState {
   diving: boolean
 
   setPhase: (p: Phase) => void
-  setSelf: (id: number, nick: string) => void
+  setSelf: (id: number) => void
+  setCustomizing: (v: boolean) => void
   setToday: (t: TodayStats) => void
   addToBasket: (item: ItemType) => void
   setCameraUnderwater: (v: boolean) => void
@@ -42,14 +44,15 @@ interface GameState {
 export const useGame = create<GameState>((set, get) => ({
   phase: 'entry',
   selfId: null,
-  nickname: '',
+  customizing: false,
   basket: loadBasket(),
   today: null,
   cameraUnderwater: false,
   diving: false,
 
   setPhase: (phase) => set({ phase }),
-  setSelf: (selfId, nickname) => set({ selfId, nickname }),
+  setSelf: (selfId) => set({ selfId }),
+  setCustomizing: (customizing) => set({ customizing }),
   setToday: (today) => set({ today }),
   addToBasket: (item) => {
     const basket = { ...get().basket, [item]: get().basket[item] + 1 }

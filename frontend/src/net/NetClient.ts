@@ -1,4 +1,4 @@
-import type { ClientMessage, ServerMessage } from './protocol'
+import type { ClientMessage, HelloMessage, ServerMessage } from './protocol'
 
 export type ServerHandler = (msg: ServerMessage) => void
 
@@ -7,7 +7,8 @@ export type ServerHandler = (msg: ServerMessage) => void
  * 1~2단계: OfflineNetClient (혼자 하는 바다), 3단계: WsNetClient (WebSocket)
  */
 export interface NetClient {
-  connect(): void
+  /** 접속하고 hello(닉네임·꾸미기 포함)를 보낸다. 서버는 welcome으로 답함 */
+  connect(hello: HelloMessage): void
   disconnect(): void
   send(msg: ClientMessage): void
   onMessage(handler: ServerHandler): () => void

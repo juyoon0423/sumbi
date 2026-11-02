@@ -12,9 +12,23 @@ export interface TodayStats {
   items: ItemCounts
 }
 
+/** 꾸미기 색 (id는 haenyeo/customize.ts 팔레트의 id, 서버가 같은 목록으로 검증) */
+export interface LookInfo {
+  towel: string
+  tewak: string
+  cheek: string
+}
+
+/** 닉네임 조합 (앞말 + 뒷말, 각 단어 목록 안의 값만 허용. 같은 닉네임이 여럿이어도 됨: 서버는 id로 구분) */
+export interface NickParts {
+  adj: string
+  noun: string
+}
+
 export interface PlayerInfo {
   id: number
   nick: string
+  look: LookInfo
   zone: Zone
   p?: Vec3
   r?: number
@@ -23,8 +37,18 @@ export interface PlayerInfo {
 }
 
 // ── 클라이언트 → 서버 ──
+export interface HelloMessage {
+  t: 'hello'
+  v: 1
+  token?: string
+  device: 'pc' | 'mobile'
+  nick: NickParts
+  look: LookInfo
+}
+
 export type ClientMessage =
-  | { t: 'hello'; v: 1; token?: string; device: 'pc' | 'mobile' }
+  | HelloMessage
+  | { t: 'look'; nick: NickParts; look: LookInfo }
   | { t: 'move'; p: Vec3; r: number }
   | { t: 'act'; a: ActionType; item?: ItemType }
   | { t: 'zone'; to: Zone }
@@ -35,13 +59,14 @@ export type ServerMessage =
   | { t: 'queue'; ahead: number }
   | {
       t: 'welcome'
-      you: { id: number; nick: string; token: string }
+      you: { id: number; nick: string; token: string; look: LookInfo }
       room: { id: string; capacity: number }
       players: PlayerInfo[]
       today: TodayStats
     }
   | { t: 'join'; player: PlayerInfo }
   | { t: 'leave'; id: number }
+  | { t: 'look'; id: number; nick: string; look: LookInfo }
   | { t: 'snap'; ts: number; ps: [number, number, number, number, number][] }
   | { t: 'evt'; id: number; a: ActionType; item?: ItemType; nick?: string }
   | { t: 'zone'; id: number; zone: Zone; seat?: number; p?: Vec3 }

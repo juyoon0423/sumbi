@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { CONFIG, ITEM_LABEL, type ItemType } from '../config'
+import { net } from '../net'
+import { lookInfo, nickParts } from '../net/hello'
+import { useCustomize } from '../store/customizeStore'
+import { CustomizeFields, CustomizeSheet, RandomAllButton } from './CustomizePanel'
 import { input } from '../player/input'
 import { player } from '../player/runtime'
 import { useGame } from '../store/gameStore'
@@ -182,8 +186,55 @@ function VolumePanel() {
   )
 }
 
+/** 오른쪽 위: 바다 속에서 다시 꾸미기 (수면에 있을 때만) */
+function CustomizeButton() {
+  const diving = useGame((s) => s.diving)
+  const setCustomizing = useGame((s) => s.setCustomizing)
+  return (
+    <button
+      className="glass round"
+      onClick={() => setCustomizing(true)}
+      disabled={diving}
+      aria-label="해녀 꾸미기"
+      title={diving ? '수면에서 꾸밀 수 있어요' : '해녀 꾸미기'}
+    >
+      🎨
+    </button>
+  )
+}
+
+/** 바다 속 꾸미기 메뉴: 바꾸면 바로 반영, 완료하면 다른 해녀들에게도 알림 */
+function SeaCustomize() {
+  const setCustomizing = useGame((s) => s.setCustomizing)
+  const done = () => {
+    const c = useCustomize.getState().custom
+    useCustomize.getState().commit()
+    net.send({ t: 'look', nick: nickParts(c), look: lookInfo(c) })
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    setCustomizing(false)
+  }
+  return (
+    <div className="sea-customize">
+      <CustomizeSheet className="open">
+        <header className="cz-head">
+          <h2>해녀 꾸미기</h2>
+          <RandomAllButton />
+        </header>
+        <CustomizeFields />
+        <div className="cz-actions">
+          <button type="button" className="entry-button" onClick={done}>
+            완료
+          </button>
+        </div>
+      </CustomizeSheet>
+    </div>
+  )
+}
+
 export function Hud() {
   const under = useGame((s) => s.cameraUnderwater)
+  const customizing = useGame((s) => s.customizing)
+  if (customizing) return <div className="hud"><SeaCustomize /></div>
   return (
     <div className="hud">
       <div className={`vignette ${under ? 'on' : ''}`} />
@@ -195,6 +246,7 @@ export function Hud() {
         <Basket />
       </div>
       <div className="top-right">
+        <CustomizeButton />
         <VolumePanel />
       </div>
       <div className="bottom-left">

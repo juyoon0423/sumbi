@@ -4,6 +4,7 @@ import { ITEM_LABEL, withObjectParticle } from '../config'
 import { useGame } from '../store/gameStore'
 import { useToasts } from '../store/toastStore'
 import { net } from '.'
+import { buildHello } from './hello'
 import type { ServerMessage } from './protocol'
 
 /** 다른 해녀의 행동 → 토스트 문구. 잠수·상승은 너무 잦아서 알리지 않음 */
@@ -27,7 +28,7 @@ export function useNetBridge() {
       const game = useGame.getState()
       switch (msg.t) {
         case 'welcome':
-          game.setSelf(msg.you.id, msg.you.nick)
+          game.setSelf(msg.you.id)
           game.setToday(msg.today)
           break
         case 'today':
@@ -51,9 +52,18 @@ export function useNetBridge() {
         }
       }
     })
-    net.connect()
+    // 입장 버튼을 누르면 그때 고른 닉네임·꾸미기로 접속
+    let connected = false
+    const connectIfPlaying = () => {
+      if (connected || useGame.getState().phase !== 'playing') return
+      connected = true
+      net.connect(buildHello())
+    }
+    connectIfPlaying()
+    const unsub = useGame.subscribe(connectIfPlaying)
     return () => {
       off()
+      unsub()
       net.disconnect()
     }
   }, [])

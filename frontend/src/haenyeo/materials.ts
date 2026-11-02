@@ -1,4 +1,5 @@
 import { Color, MeshStandardMaterial } from 'three'
+import { CHEEK_PALETTE, TEWAK_PALETTE, TOWEL_PALETTE } from './customize'
 
 // 레퍼런스처럼 광택 없는 소프트 비닐/점토 느낌 (roughness 높게, 금속성 0, 강한 반사 없음)
 // 50명이 모여도 재질 수가 늘지 않도록 전부 모듈 단위로 공유한다.
@@ -15,7 +16,6 @@ export const MAT = {
   })(),
   suit: matte('#2c3038', 0.8),
   suitTrim: matte('#3d4652', 0.85),
-  cheek: new MeshStandardMaterial({ color: '#f5a8a2', roughness: 1, transparent: true, opacity: 0.75 }),
   eye: matte('#1d1c20', 0.5),
   mouth: matte('#9a514c', 0.9),
   goggleFrame: matte('#3a5266', 0.7),
@@ -32,9 +32,10 @@ export const MAT = {
   net: new MeshStandardMaterial({ color: '#46663f', roughness: 1, wireframe: true, transparent: true, opacity: 0.55 }),
 }
 
-// ── 닉네임마다 다른 파스텔 물수건, 주황 계열 안에서 조금씩 다른 테왁 ──
-export const TOWEL_COLORS = ['#f6f1e7', '#cfe6f6', '#f8d5dd', '#f8ecbd', '#d5ecd3', '#e4daf3']
-export const TEWAK_COLORS = ['#f5862b', '#f37a2b', '#f8942f', '#f26e2e', '#f6a03a']
+// ── 꾸미기 색: 파스텔 물수건, 주황 계열 테왁, 볼 (haenyeo/customize.ts) ──
+export const TOWEL_COLORS = TOWEL_PALETTE.map((s) => s.color)
+export const TEWAK_COLORS = TEWAK_PALETTE.map((s) => s.color)
+export const CHEEK_COLORS = CHEEK_PALETTE.map((s) => s.color)
 
 const cache = new Map<string, MeshStandardMaterial>()
 
@@ -52,5 +53,11 @@ export function tewakMaterial(color: string) {
     m.emissive = new Color(color).multiplyScalar(0.12)
     cache.set(key, m)
   }
+  return cache.get(key)!
+}
+
+export function cheekMaterial(color: string) {
+  const key = `cheek:${color}`
+  if (!cache.has(key)) cache.set(key, new MeshStandardMaterial({ color, roughness: 1, transparent: true, opacity: 0.75 }))
   return cache.get(key)!
 }

@@ -1,8 +1,9 @@
 import type { ItemType } from '../config'
-import { generateNickname, loadOrCreateNickname } from '../lib/nickname'
+import { nickOf } from '../haenyeo/customize'
+import { generateNickname } from '../lib/nickname'
 import { kstDateKey } from '../lib/today'
 import { Emitter, type NetClient } from './NetClient'
-import type { ClientMessage, ItemCounts, TodayStats } from './protocol'
+import type { ClientMessage, HelloMessage, ItemCounts, TodayStats } from './protocol'
 
 const SELF_ID = 1
 const TODAY_KEY = 'sumbi.offlineToday'
@@ -31,13 +32,13 @@ export class OfflineNetClient implements NetClient {
     this.today = this.loadToday()
   }
 
-  connect() {
+  connect(hello: HelloMessage) {
     // 실제 서버처럼 비동기로 응답
     this.disconnect()
     this.timer = window.setTimeout(() => {
       this.emitter.emit({
         t: 'welcome',
-        you: { id: SELF_ID, nick: loadOrCreateNickname(), token: 'offline' },
+        you: { id: SELF_ID, nick: nickOf(hello.nick), token: 'offline', look: hello.look },
         room: { id: 'offline', capacity: 1 },
         players: [],
         today: this.today,
@@ -55,6 +56,10 @@ export class OfflineNetClient implements NetClient {
   }
 
   send(msg: ClientMessage) {
+    if (msg.t === 'look') {
+      this.emitter.emit({ t: 'look', id: SELF_ID, nick: nickOf(msg.nick), look: msg.look })
+      return
+    }
     if (msg.t !== 'act') return
     this.emitter.emit({ t: 'evt', id: SELF_ID, a: msg.a, item: msg.item })
     if (msg.a === 'harvest' && msg.item) this.addHarvest(msg.item)

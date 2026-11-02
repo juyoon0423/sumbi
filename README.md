@@ -36,6 +36,7 @@ npm run dev
 | WASD / 방향키 | 수면·물속 이동 (카메라 기준) |
 | Space 누르고 있기 | 잠수. 떼면 상승 |
 | 1 | 손 흔들어 인사 |
+| 🎨 (오른쪽 위) | 해녀 꾸미기 (수면에 있을 때) |
 | 마우스 드래그 / 휠 | 시점 회전 / 줌 |
 
 ## 개발 메모
@@ -46,4 +47,5 @@ npm run dev
 - 캐릭터 랩: 개발 서버에서 http://localhost:5173/dev/character — 동작·표정·닉네임별 외형을 나란히 봅니다. `?solo=sumbi&t=0.6`처럼 하나를 크게, 한 순간에 고정할 수 있습니다.
 - 화면 캡처: 개발 서버를 켠 상태에서 `npm run capture` → `docs/screenshots/latest/` (설치된 Chrome을 Playwright로 사용)
 - 잠수 동작 연속 캡처(0.1초 간격, 옆·뒤): `node scripts/capture-dive.mjs <출력폴더>`
-- 브라우저 저장소(localStorage)를 지우면 닉네임·바구니·볼륨 설정이 초기화됩니다.
+- 꾸미기 화면 캡처: `node scripts/capture-customize.mjs <출력폴더>` (데스크톱·모바일 세로, 처음/다시 방문, 바다 속 🎨 메뉴)
+- 브라우저 저장소(localStorage)를 지우면 꾸민 해녀(닉네임·색)·바구니·볼륨 설정이 초기화됩니다.

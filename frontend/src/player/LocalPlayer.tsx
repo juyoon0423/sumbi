@@ -3,13 +3,15 @@ import { useEffect, useMemo, useRef } from 'react'
 import { Group, Vector3 } from 'three'
 import { audio } from '../audio/AudioEngine'
 import { CONFIG, ITEM_LABEL, withObjectParticle } from '../config'
-import { Haenyeo } from '../haenyeo/Haenyeo'
-import { lookFromNick } from '../haenyeo/look'
+import { CHEER_DURATION, Haenyeo } from '../haenyeo/Haenyeo'
+import { nickOf } from '../haenyeo/customize'
+import { lookFromCustom } from '../haenyeo/look'
 import { Tewak } from '../haenyeo/Tewak'
 import { setState, UNDERWATER_STATES } from '../haenyeo/types'
 import { clamp, damp, lerpAngle } from '../lib/math'
 import { net } from '../net'
 import { useBubbles } from '../store/bubbleStore'
+import { useCustomize } from '../store/customizeStore'
 import { useGame } from '../store/gameStore'
 import { NameTag } from '../ui/NameTag'
 import { terrainY } from '../world/terrain'
@@ -36,8 +38,10 @@ export function LocalPlayer() {
   const root = useRef<Group>(null)
   const timers = useRef({ send: 0, sent: new Vector3(Infinity, 0, 0), heartbeat: 0, bubbleSound: 1, bubbleFx: 0 })
   const phase = useGame((s) => s.phase)
-  const nickname = useGame((s) => s.nickname)
-  const look = useMemo(() => lookFromNick(nickname), [nickname])
+  const customizing = useGame((s) => s.customizing)
+  const custom = useCustomize((s) => s.custom)
+  const look = useMemo(() => lookFromCustom(custom), [custom])
+  const nickname = nickOf(custom)
 
   useEffect(() => attachKeyboard(), [])
 
@@ -46,7 +50,10 @@ export function LocalPlayer() {
     const t = clock.elapsedTime
     const p = player
     const pose = p.pose
-    const playing = useGame.getState().phase === 'playing'
+    const game = useGame.getState()
+    // 꾸미는 중(입장 화면 / 바다 속 꾸미기 메뉴): 조작 없이 카메라 쪽을 보며 천천히 몸을 돌림
+    const showcase = game.phase === 'entry' || game.customizing
+    const playing = game.phase === 'playing' && !game.customizing
     pose.stateTime += dt
 
     // ── 입력 ──
@@ -163,7 +170,9 @@ export function LocalPlayer() {
     }
 
     // ── 카메라 쪽으로 뒤돌아보기: 표정이 보여야 하는 순간과 한동안 가만히 있을 때 ──
-    if (moveAmt < 0.01) {
+    if (showcase) {
+      p.yaw = lerpAngle(p.yaw, cameraRig.yaw + Math.sin(t * 0.45) * 0.55, damp(2.5, dt))
+    } else if (moveAmt < 0.01) {
       const st = pose.stateTime
       const showOff =
         pose.waveTime >= 0 ||
@@ -209,12 +218,15 @@ export function LocalPlayer() {
         p.pos.y += (surf - p.pos.y) * damp(10, dt)
     }
 
+    // ── 꾸미기 반응 (콩 뛰며 기뻐하기) ──
+    if (pose.cheerTime >= 0) pose.cheerTime = pose.cheerTime > CHEER_DURATION ? -1 : pose.cheerTime + dt
+
     // ── 인사 (다른 동작 위에 겹쳐 재생) ──
     if (pose.waveTime >= 0) {
       pose.waveTime += dt
       if (pose.waveTime > CONFIG.waveDuration) pose.waveTime = -1
     }
-    if (consumeWave() && pose.waveTime < 0 && pose.state !== 'entering' && pose.state !== 'descending' && pose.state !== 'ascending') {
+    if (consumeWave() && playing && pose.waveTime < 0 && pose.state !== 'entering' && pose.state !== 'descending' && pose.state !== 'ascending') {
       pose.waveTime = 0
       audio.playChime()
       useBubbles.getState().sayself('손 흔들어 인사했어요')
@@ -247,7 +259,7 @@ export function LocalPlayer() {
     }
 
     // ── 위치 송신 (초당 최대 10회, 거의 안 움직이면 1초에 1회) ──
-    if (playing && t > timers.current.send) {
+    if (game.phase === 'playing' && t > timers.current.send) {
       const moved = timers.current.sent.distanceToSquared(p.pos) > 0.0004
       if (moved || t > timers.current.send + 1) {
         net.send({ t: 'move', p: [round(p.pos.x), round(p.pos.y), round(p.pos.z)], r: round(p.yaw) })
@@ -261,7 +273,7 @@ export function LocalPlayer() {
     <>
       <group ref={root}>
         <Haenyeo pose={player.pose} look={look} />
-        {phase === 'playing' && <NameTag nick={nickname} self />}
+        {phase === 'playing' && !customizing && <NameTag nick={nickname} self />}
       </group>
       <Tewak state={player.tewak} material={look.tewak} />
     </>

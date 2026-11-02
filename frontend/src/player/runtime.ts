@@ -33,3 +33,9 @@ export const fx = {
   /** 수면 물보라. power 1 = 보통, 클수록 물방울이 많고 높이 튐 */
   splashes: [] as { pos: Vector3; power: number }[],
 }
+
+/**
+ * 꾸미기(입장 화면·바다 속 꾸미기 메뉴) 동안 해녀를 크게 보여줄 화면 영역 (CSS px).
+ * 꾸미기 패널이 차지하지 않은 빈 곳의 가운데에 해녀가 오도록 카메라가 맞춘다.
+ */
+export const showcaseView = { x: 0, y: 0, w: 0, h: 0 }

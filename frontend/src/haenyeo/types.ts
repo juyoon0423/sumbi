@@ -34,10 +34,12 @@ export interface HaenyeoPose {
   breath: number
   /** 채집 중 손에 든 해산물 */
   heldItem: ItemType | null
+  /** 꾸미기를 바꿨을 때 기뻐하는 반응 시작 후 지난 시간(초). 없으면 -1 */
+  cheerTime: number
 }
 
 export function createPose(): HaenyeoPose {
-  return { state: 'surfaceIdle', stateTime: 0, move: 0, waveTime: -1, breath: 1, heldItem: null }
+  return { state: 'surfaceIdle', stateTime: 0, move: 0, waveTime: -1, breath: 1, heldItem: null, cheerTime: -1 }
 }
 
 export function setState(pose: HaenyeoPose, next: HaenyeoState) {

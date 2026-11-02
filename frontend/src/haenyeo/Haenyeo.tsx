@@ -178,10 +178,16 @@ function computeTarget(pose: HaenyeoPose, a: Anim, t: number): { tg: Target; fac
   }
   // 인사하는 동안 눈웃음
   if (pose.waveTime >= 0 && face.eyes === 'dot') face.eyes = 'happy'
+  // 꾸미기 반응: 활짝 웃기
+  if (pose.cheerTime >= 0) {
+    face.eyes = 'happy'
+    face.mouth = 'smile'
+  }
 
   return { tg, face }
 }
 
+export const CHEER_DURATION = 0.75
 const EYE_X = 0.1
 const EYE_Y = -0.07
 const CHEEK_X = 0.205
@@ -268,6 +274,15 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
       if (p < 0.22) stretch = 1.14 - 0.14 * (p / 0.22)
       else stretch = 1 - 0.18 * hump((p - 0.22) / 0.42)
     }
+    // 꾸미기 반응: 살짝 웅크렸다 콩 뛰기
+    const cheer = pose.cheerTime
+    if (cheer >= 0) {
+      if (cheer < 0.12) stretch *= 1 - 0.12 * hump(cheer / 0.12)
+      else if (cheer < 0.46) {
+        popY += 0.11 * hump((cheer - 0.12) / 0.34)
+        stretch *= 1 + 0.07 * hump((cheer - 0.12) / 0.34)
+      }
+    }
     pop.current.position.y = popY + Math.sin(t * 2.2) * 0.012
     const side = 1 / Math.sqrt(stretch)
     squash.current.scale.set(side, stretch, side)
@@ -288,6 +303,17 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
       armR.current.rotation.x = armR.current.rotation.x * (1 - w) - 0.25 * w
       armR.current.rotation.z = armR.current.rotation.z * (1 - w) + (-2.45 + flap) * w
       body.current.rotation.z += Math.sin(pose.waveTime * 11) * 0.05 * w
+    }
+
+    if (cheer >= 0) {
+      // 두 팔 번쩍 + 살랑살랑
+      const w = smoothstep(0, 0.1, cheer) * (1 - smoothstep(CHEER_DURATION - 0.22, CHEER_DURATION, cheer))
+      const wig = Math.sin(cheer * 26) * 0.18
+      armL.current.rotation.x = armL.current.rotation.x * (1 - w) - 0.2 * w
+      armR.current.rotation.x = armR.current.rotation.x * (1 - w) - 0.2 * w
+      armL.current.rotation.z = armL.current.rotation.z * (1 - w) + (2.2 + wig) * w
+      armR.current.rotation.z = armR.current.rotation.z * (1 - w) - (2.2 - wig) * w
+      head.current.rotation.z += Math.sin(cheer * 13) * 0.08 * w
     }
 
     // ── 다리: 파닥파닥 ↔ 개구리헤엄 ──
@@ -386,8 +412,8 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
 
               {/* 얼굴: 눈은 얼굴 아래쪽에 작게 */}
               {(['dot', 'round', 'happy', 'line'] as Eyes[]).map(eyePair)}
-              <mesh ref={cheekL} geometry={GEO.cheek} material={MAT.cheek} position={[CHEEK_X, CHEEK_Y, cz]} rotation={[0, 0.6, 0]} />
-              <mesh ref={cheekR} geometry={GEO.cheek} material={MAT.cheek} position={[-CHEEK_X, CHEEK_Y, cz]} rotation={[0, -0.6, 0]} />
+              <mesh ref={cheekL} geometry={GEO.cheek} material={look.cheek} position={[CHEEK_X, CHEEK_Y, cz]} rotation={[0, 0.6, 0]} />
+              <mesh ref={cheekR} geometry={GEO.cheek} material={look.cheek} position={[-CHEEK_X, CHEEK_Y, cz]} rotation={[0, -0.6, 0]} />
               <mesh
                 ref={(m) => {
                   mouths.current.dot = m

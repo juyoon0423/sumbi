@@ -1,23 +1,27 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
-import { Vector3 } from 'three'
+import { PerspectiveCamera, Vector2, Vector3 } from 'three'
 import { UNDERWATER_STATES } from '../haenyeo/types'
 import { clamp, damp, lerpAngle } from '../lib/math'
 import { useGame } from '../store/gameStore'
 import { terrainY } from '../world/terrain'
 import { waveHeight } from '../world/sea/waves'
-import { cameraRig, player } from './runtime'
+import { cameraRig, player, showcaseView } from './runtime'
 
 // 3인칭 카메라: 내 해녀 뒤를 부드럽게 따라옴. 마우스로 끌어 둘러보기, 휠로 줌.
 // 움직이기 시작하면 천천히 다시 등 뒤로 돌아온다.
 
 const PITCH_MIN = -0.35
 const PITCH_MAX = 1.1
+/** 입장 화면에서 해녀를 바라보는 방향: 해녀 뒤로 해안과 한라산이 보임 */
+const ENTRY_YAW = 0.3
 
 export function FollowCamera() {
-  const { camera, gl } = useThree()
+  const { camera, gl, size } = useThree()
   const target = useRef(new Vector3().copy(player.pos))
   const desired = useRef(new Vector3())
+  /** 화면 중심을 옮기는 양 (꾸미기 패널을 피해 해녀를 빈 곳 가운데에 둠) */
+  const viewShift = useRef(new Vector2())
   const drag = useRef<{ x: number; y: number; id: number } | null>(null)
 
   useEffect(() => {
@@ -70,14 +74,28 @@ export function FollowCamera() {
     const headDown = state === 'descending'
     target.current.y += (p.y + (headDown ? -0.15 : 0.55) - target.current.y) * damp(headDown ? 9 : under ? 5 : 3, dt)
 
-    if (useGame.getState().phase === 'entry') {
-      // 입장 전: 내 해녀 주변을 천천히 도는 풍경
-      const a = t * 0.05 + 2.4
-      desired.current.set(p.x + Math.sin(a) * 11, 3.2, p.z + Math.cos(a) * 11)
-      camera.position.lerp(desired.current, damp(1.5, dt))
-      camera.lookAt(p.x, 0.8, p.z)
-      // 입장하면 카메라가 등 뒤로 내려오도록 미리 맞춰 둠
-      cameraRig.yaw = player.yaw + Math.PI
+    const game = useGame.getState()
+    const showcase = game.phase === 'entry' || game.customizing
+    applyViewShift(camera as PerspectiveCamera, size.width, size.height, viewShift.current, showcase, dt)
+
+    if (showcase) {
+      // 꾸미기: 해녀 앞에서 크게. 패널이 가리지 않은 영역에 몸 전체가 들어오도록 거리 조절
+      if (game.phase === 'entry') cameraRig.yaw = ENTRY_YAW
+      const cam = camera as PerspectiveCamera
+      const tanHalf = Math.tan((cam.fov * Math.PI) / 360)
+      const fh = Math.max(0.2, (showcaseView.h || size.height) / size.height)
+      const fw = Math.max(0.2, (showcaseView.w || size.width) / size.width)
+      const dist = clamp(Math.max(1.3 / (0.58 * fh * 2 * tanHalf), 1.0 / (0.6 * fw * 2 * tanHalf * cam.aspect), 2.3), 2.3, 9)
+      const pitch = 0.14
+      const focusY = p.y + 0.38
+      desired.current.set(
+        p.x + Math.sin(cameraRig.yaw) * Math.cos(pitch) * dist,
+        Math.max(focusY + Math.sin(pitch) * dist, waveHeight(p.x, p.z, t) + 0.35),
+        p.z + Math.cos(cameraRig.yaw) * Math.cos(pitch) * dist,
+      )
+      camera.position.lerp(desired.current, damp(4, dt))
+      target.current.set(p.x, focusY, p.z)
+      camera.lookAt(target.current)
       return
     }
 
@@ -107,4 +125,19 @@ export function FollowCamera() {
   }, -1)
 
   return null
+}
+
+/** 꾸미기 패널을 피해 화면 중심을 옆(데스크톱)·위(모바일 세로)로 옮김. 평소엔 부드럽게 0으로 */
+function applyViewShift(cam: PerspectiveCamera, w: number, h: number, shift: Vector2, on: boolean, dt: number) {
+  const v = showcaseView
+  const tx = on && v.w > 0 ? w / 2 - (v.x + v.w / 2) : 0
+  const ty = on && v.h > 0 ? h / 2 - (v.y + v.h / 2) : 0
+  const k = damp(5, dt)
+  shift.x += (tx - shift.x) * k
+  shift.y += (ty - shift.y) * k
+  if (Math.abs(shift.x) < 0.5 && Math.abs(shift.y) < 0.5 && !on) {
+    if (cam.view?.enabled) cam.clearViewOffset()
+    return
+  }
+  cam.setViewOffset(w, h, shift.x, shift.y, w, h)
 }
