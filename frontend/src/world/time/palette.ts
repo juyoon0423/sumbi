@@ -36,35 +36,35 @@ export interface Palette {
 type Raw = { [K in keyof Palette]: Palette[K] extends Color ? string : number }
 
 const NIGHT: Raw = {
-  skyTop: '#050b1c', horizon: '#18263d', light: '#9fb4e0', lightI: 0.55,
+  skyTop: '#040a1a', horizon: '#1e2f4f', light: '#9fb4e0', lightI: 0.55,
   hemiSky: '#6d82b0', hemiGround: '#2a2f3a', hemiI: 0.62, ambientI: 0.14,
   deep: '#04121f', shallow: '#0a2c3c', reflect: '#1a2a44', glint: '#c8d6f5', glintI: 0.45,
   underFog: '#041824', underDark: '#05161f', underBright: '#2c5a70',
   rays: 0.1, stars: 1, plankton: 1, night: 1,
 }
 const PREDAWN: Raw = {
-  skyTop: '#1d2550', horizon: '#b58aa8', light: '#ffb38a', lightI: 0.6,
+  skyTop: '#34548e', horizon: '#d9a0aa', light: '#ffb38a', lightI: 0.6,
   hemiSky: '#9a9cc8', hemiGround: '#4a4048', hemiI: 0.8, ambientI: 0.16,
   deep: '#0b2c44', shallow: '#1f5d72', reflect: '#8a7fa6', glint: '#ffc6a0', glintI: 0.6,
   underFog: '#0f3a52', underDark: '#0e3a4c', underBright: '#7aa6c0',
   rays: 0.3, stars: 0.35, plankton: 0.45, night: 0.6,
 }
 const SUNRISE: Raw = {
-  skyTop: '#5583bb', horizon: '#f2b892', light: '#ffb070', lightI: 1.5,
+  skyTop: '#4f80bd', horizon: '#f2b892', light: '#ffb070', lightI: 1.5,
   hemiSky: '#c8d4f0', hemiGround: '#a08a74', hemiI: 1.05, ambientI: 0.2,
   deep: '#0d4460', shallow: '#2a8a96', reflect: '#e8b9a0', glint: '#ffd0a0', glintI: 1.0,
   underFog: '#18607a', underDark: '#125468', underBright: '#b0e4ef',
   rays: 0.7, stars: 0, plankton: 0, night: 0.15,
 }
 const DAY: Raw = {
-  skyTop: '#6fa9d6', horizon: '#cfe0e8', light: '#ffe2bd', lightI: 2.1,
+  skyTop: '#3d7cc4', horizon: '#d3e3ec', light: '#ffe2bd', lightI: 2.1,
   hemiSky: '#dcefff', hemiGround: '#c9b48f', hemiI: 1.35, ambientI: 0.25,
   deep: '#0e4c66', shallow: '#2a9aa3', reflect: '#bfdcea', glint: '#fff1d6', glintI: 0.9,
   underFog: '#1d6a80', underDark: '#145d70', underBright: '#bff3fb',
   rays: 1, stars: 0, plankton: 0, night: 0,
 }
 const GOLDEN: Raw = {
-  skyTop: '#5d8cc4', horizon: '#f2c98f', light: '#ffbf7a', lightI: 1.85,
+  skyTop: '#4a80c0', horizon: '#f2c98f', light: '#ffbf7a', lightI: 1.85,
   hemiSky: '#e9d8c0', hemiGround: '#b0906c', hemiI: 1.15, ambientI: 0.22,
   deep: '#0f4660', shallow: '#2f8f92', reflect: '#f0caa0', glint: '#ffd39a', glintI: 1.25,
   underFog: '#1d6070', underDark: '#13505f', underBright: '#e0e8c8',
@@ -78,7 +78,7 @@ const SUNSET: Raw = {
   rays: 0.4, stars: 0.08, plankton: 0.2, night: 0.35,
 }
 const DUSK: Raw = {
-  skyTop: '#141c3c', horizon: '#6a4a70', light: '#a8a8d8', lightI: 0.55,
+  skyTop: '#121a3a', horizon: '#5e4a72', light: '#a8a8d8', lightI: 0.55,
   hemiSky: '#6c6c9c', hemiGround: '#3a3440', hemiI: 0.62, ambientI: 0.14,
   deep: '#071a2c', shallow: '#10303f', reflect: '#4a3e60', glint: '#c8c8f0', glintI: 0.5,
   underFog: '#08202e', underDark: '#081d28', underBright: '#3a5a70',

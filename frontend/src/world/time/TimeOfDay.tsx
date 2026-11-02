@@ -1,9 +1,12 @@
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
-import { BackSide, Color, ShaderMaterial, SphereGeometry, Vector3, type Mesh } from 'three'
+import { BackSide, ShaderMaterial, SphereGeometry, Vector3, type Mesh } from 'three'
 import { damp } from '../../lib/math'
 import { env, targetHour } from './env'
+import { displayMoonPhase } from './moon'
 import { samplePalette } from './palette'
+import { SKY_GLSL, skyUniforms } from '../sky/skyGlsl'
+import { GALAXY_CENTER, GALAXY_NORMAL } from '../sky/galaxy'
 
 // 시간대 진행: 한국 시간(또는 개발용 고정 시각)을 따라 env 를 매 프레임 갱신하고 하늘을 그린다.
 // 고정 시각을 바꾸면 그 사이 시간을 몇 초에 걸쳐 지나가며 부드럽게 바뀜 (낮 → 밤이면 노을을 거침).
@@ -37,16 +40,11 @@ export function TimeOfDay() {
         depthWrite: false,
         fog: false,
         uniforms: {
-          uTop: { value: new Color() },
-          uHorizon: { value: new Color() },
-          uSunDir: { value: new Vector3() },
-          uSunColor: { value: new Color() },
-          uSunVis: { value: 1 },
-          uMoonDir: { value: new Vector3() },
-          uMoonVis: { value: 0 },
+          ...skyUniforms,
           uStars: { value: 0 },
-          uWarm: { value: 0 },
           uTime: { value: 0 },
+          uGalN: { value: GALAXY_NORMAL },
+          uGalC: { value: GALAXY_CENTER },
         },
         vertexShader: /* glsl */ `
           varying vec3 vDir;
@@ -57,59 +55,82 @@ export function TimeOfDay() {
           }
         `,
         fragmentShader: /* glsl */ `
-          uniform vec3 uTop;
-          uniform vec3 uHorizon;
-          uniform vec3 uSunDir;
-          uniform vec3 uSunColor;
-          uniform float uSunVis;
-          uniform vec3 uMoonDir;
-          uniform float uMoonVis;
+          ${SKY_GLSL}
           uniform float uStars;
-          uniform float uWarm;
           uniform float uTime;
+          uniform vec3 uGalN;
+          uniform vec3 uGalC;
           varying vec3 vDir;
 
-          float hash(vec3 p) {
-            p = fract(p * 0.3183099 + 0.1);
-            p *= 17.0;
-            return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+          float fbm(vec3 p) {
+            return skyNoise(p) * 0.5 + skyNoise(p * 2.03) * 0.25 + skyNoise(p * 4.1) * 0.15 + skyNoise(p * 8.3) * 0.1;
           }
-          float vnoise(vec3 p) {
-            vec3 i = floor(p);
-            vec3 f = fract(p);
-            f = f * f * (3.0 - 2.0 * f);
-            return mix(
-              mix(mix(hash(i), hash(i + vec3(1, 0, 0)), f.x), mix(hash(i + vec3(0, 1, 0)), hash(i + vec3(1, 1, 0)), f.x), f.y),
-              mix(mix(hash(i + vec3(0, 0, 1)), hash(i + vec3(1, 0, 1)), f.x), mix(hash(i + vec3(0, 1, 1)), hash(i + vec3(1, 1, 1)), f.x), f.y),
-              f.z);
+
+          // 은하수: 별이 촘촘한 띠 + 가운데(궁수자리 쪽) 볼록하고 따뜻한 빛 + 어두운 먼지 줄무늬 + 아주 작은 별 알갱이
+          vec3 milkyWay(vec3 d) {
+            float b = dot(d, uGalN); // 은하 위도 (sin)
+            vec3 inPlane = normalize(d - uGalN * b + 1e-5);
+            float l = dot(inPlane, uGalC); // 1 = 은하 중심 쪽
+            float core = smoothstep(-0.2, 1.0, l);
+            float width = 0.07 + 0.09 * core * core;
+            float band = exp(-pow(b / width, 2.0));
+            float clump = fbm(d * 9.0);
+            float star = smoothstep(0.35, 0.85, clump) * 0.8 + 0.2;
+            // 먼지 줄무늬: 띠 가운데를 따라 구불구불하게 어둡게
+            float lane = exp(-pow((b - 0.018 * (fbm(d * 5.0) - 0.5) * 4.0) / (0.022 + 0.02 * core), 2.0));
+            float dust = lane * smoothstep(0.35, 0.7, fbm(d * 14.0 + 3.1)) * (0.45 + 0.55 * core);
+            float bright = band * star * (0.35 + 0.9 * core * core) * (1.0 - dust * 0.85);
+            // 띠 바깥으로 아주 옅게 번짐
+            bright += exp(-pow(b / (width * 2.6), 2.0)) * 0.08 * (0.5 + core);
+            vec3 tint = mix(vec3(0.58, 0.66, 0.95), vec3(0.95, 0.86, 0.72), core * core * 0.75);
+            vec3 col = tint * bright;
+            // 아주 작은 별 알갱이 (띠 안에서 더 많이)
+            vec3 g = d * 520.0;
+            vec3 cell = floor(g);
+            float h = skyHash(cell);
+            float density = 0.06 + 0.5 * band * star;
+            vec3 f = fract(g) - 0.5;
+            float grain = step(1.0 - density * 0.35, h) * smoothstep(0.32, 0.0, length(f.xy + f.z * 0.3));
+            col += vec3(0.85, 0.88, 1.0) * grain * (0.25 + 0.5 * fract(h * 37.0)) * (0.4 + band);
+            return col;
+          }
+
+          // 달: 실제 모양(위상) + 바다(어두운 무늬) + 어두운 쪽은 지구빛으로 아주 희미하게
+          vec3 moonDisc(vec3 d, out float cover) {
+            vec3 right = normalize(cross(uMoonDir, vec3(0.0, 1.0, 0.0)));
+            vec3 upv = cross(right, uMoonDir);
+            float R = 0.027;
+            vec2 q = vec2(dot(d, right), dot(d, upv)) / R;
+            float r = length(q);
+            cover = smoothstep(1.0, 0.94, r) * step(0.0, dot(d, uMoonDir));
+            if (cover <= 0.0) return vec3(0.0);
+            vec3 n = vec3(q, sqrt(max(0.0, 1.0 - r * r)));
+            float th = uMoonPhase * 6.2831853;
+            // 차오르는 달은 오른쪽부터 (북반구)
+            vec3 L = vec3(sin(th), 0.0, -cos(th));
+            float lit = smoothstep(-0.04, 0.1, dot(n, L));
+            float maria = 0.78 + 0.22 * smoothstep(0.35, 0.65, skyNoise(vec3(q * 2.6, 1.7))) - 0.12 * smoothstep(0.55, 0.75, skyNoise(vec3(q * 5.0, 4.2)));
+            float limb = 0.82 + 0.18 * n.z;
+            return vec3(1.0, 0.98, 0.92) * (lit * maria * limb * 1.15 + 0.05);
           }
 
           void main() {
             vec3 d = normalize(vDir);
-            float up = max(d.y, 0.0);
-            vec3 col = mix(uHorizon, uTop, pow(up, 0.55));
+            vec3 col = skyColor(d);
 
-            // 노을: 주황 지평선과 남색 하늘 사이를 보랏빛 띠로 (해 쪽이 더 진하게)
-            float sunSide = 0.6 + 0.4 * max(dot(normalize(vec3(d.x, 0.0, d.z)), normalize(vec3(uSunDir.x, 0.0, uSunDir.z))), 0.0);
-            float band = exp(-pow((up - 0.2) / 0.16, 2.0));
-            col = mix(col, vec3(0.55, 0.36, 0.62), band * uWarm * 0.55 * sunSide);
+            // 은하수와 작은 별 알갱이 (밤에만, 수평선 가까이·달 근처는 옅게)
+            float md = max(dot(d, uMoonDir), 0.0);
+            float vis = uStars * smoothstep(0.02, 0.3, d.y) * (1.0 - 0.7 * smoothstep(0.9, 0.995, md));
+            if (vis > 0.001) col += milkyWay(d) * 0.115 * vis;
 
-            // 해: 둥근 원 + 둘레 빛 (지평선 근처에선 하늘 아래쪽까지 물듦)
+            // 해 원반
             float sd = max(dot(d, uSunDir), 0.0);
-            col += uSunColor * (pow(sd, 6.0) * 0.22 + pow(sd, 64.0) * 0.35) * uSunVis;
             col = mix(col, uSunColor * 1.3 + 0.25, smoothstep(0.9993, 0.9996, sd) * uSunVis);
 
-            // 달 + 은은한 무리
-            float md = max(dot(d, uMoonDir), 0.0);
-            col += vec3(0.55, 0.62, 0.8) * pow(md, 200.0) * 0.35 * uMoonVis;
-            col = mix(col, vec3(0.95, 0.96, 1.0), smoothstep(0.99955, 0.99975, md) * uMoonVis);
-
-            // 은하수: 하늘을 비스듬히 가로지르는 옅은 띠 (별 하나하나는 Starfield 가 그림)
-            float mw = dot(d, normalize(vec3(0.82, 0.3, 0.48)));
-            float n = vnoise(d * 7.0) * 0.6 + vnoise(d * 17.0) * 0.3 + vnoise(d * 41.0) * 0.1;
-            float milky = exp(-pow(mw / 0.13, 2.0)) * smoothstep(0.25, 0.85, n);
-            milky += exp(-pow(mw / 0.05, 2.0)) * 0.25;
-            col += vec3(0.62, 0.66, 0.85) * milky * 0.13 * uStars * smoothstep(0.03, 0.3, d.y) * (1.0 - md);
+            // 달 원반 (구름은 그 앞에 그려짐)
+            float cover;
+            vec3 moon = moonDisc(d, cover);
+            col = mix(col, moon, cover * uMoonVis);
 
             gl_FragColor = vec4(col, 1.0);
             #include <colorspace_fragment>
@@ -145,20 +166,28 @@ export function TimeOfDay() {
     env.lightDir.copy(tmp).lerp(env.moonDir, moonW).normalize()
     env.glintPow = 180 - 60 * moonW
 
-    const u = material.uniforms
-    u.uTop.value.copy(env.skyTop)
-    u.uHorizon.value.copy(env.horizon)
+    const u = skyUniforms
+    u.uSkyTop.value.copy(env.skyTop)
+    u.uSkyHorizon.value.copy(env.horizon)
     u.uSunDir.value.copy(env.sunDir)
     u.uSunColor.value.copy(env.light).lerp(env.glint, 0.4)
     u.uSunVis.value = Math.min(1, Math.max(0, (env.sunDir.y + 0.04) / 0.08))
     u.uMoonDir.value.copy(env.moonDir)
     u.uMoonVis.value = moonW
-    u.uStars.value = env.stars
+    // 달 모양은 가끔만 다시 계산 (하루에 조금씩 바뀜)
+    if (clock.elapsedTime - lastPhaseAt > 60 || lastPhaseAt < 0) {
+      u.uMoonPhase.value = displayMoonPhase()
+      lastPhaseAt = clock.elapsedTime
+    }
     // 해가 지평선 언저리이고 아직 밤이 아닐 때 = 노을빛
     u.uWarm.value = Math.max(0, 1 - Math.abs(env.sunDir.y - 0.03) / 0.2) * Math.max(0, 1 - env.night * 1.1)
-    u.uTime.value = clock.elapsedTime
+    u.uNight.value = env.night
+    material.uniforms.uStars.value = env.stars
+    material.uniforms.uTime.value = clock.elapsedTime
     sky.current.position.copy(camera.position)
   }, -1)
 
   return <mesh ref={sky} geometry={geometry} material={material} frustumCulled={false} renderOrder={-10} />
 }
+
+let lastPhaseAt = -1
