@@ -1,5 +1,6 @@
-import { Vector3 } from 'three'
+import { Vector3, type Camera } from 'three'
 import { createPose } from '../haenyeo/types'
+import type { SeatWalk } from '../world/bulteok/seatWalk'
 
 // 매 프레임 바뀌는 값은 React 상태가 아니라 이 객체에 둔다 (리렌더 없음).
 
@@ -21,6 +22,10 @@ export const player = {
   zone: 'sea' as 'sea' | 'bulteok',
   /** 불턱 자리 (바다면 -1) */
   seat: -1,
+  /** 불턱에서 자리를 옮겨 걷는 중 */
+  walk: null as SeatWalk | null,
+  /** 걷기를 마치고 앉은 시각 (performance.now ms) — 정면 시점 전환 기다림 */
+  settledAt: -Infinity,
 }
 
 /** 카메라 리그 상태 (이동 방향 계산에 필요) */
@@ -30,9 +35,14 @@ export const cameraRig = {
   pitch: 0.42,
   distance: 5.2,
   lastDragAt: -Infinity,
+  /** 마지막으로 시점을 직접 만진 시각 (끌기·휠·자리 누르기). 불턱 정면 시점 자동 전환에 씀 */
+  lastInputAt: -Infinity,
   /** 다음 프레임에 카메라를 보간 없이 바로 옮김 (구역 이동) */
   snap: false,
 }
+
+/** 지금 화면 카메라 (개발용 좌표 변환) */
+export const view = { camera: null as Camera | null }
 
 /** 이펙트 요청 큐 (LocalPlayer → 이펙트 컴포넌트) */
 export const fx = {

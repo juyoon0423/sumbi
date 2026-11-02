@@ -1,4 +1,4 @@
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import {
   AdditiveBlending,
@@ -22,7 +22,9 @@ import {
 import { audio } from '../../audio/AudioEngine'
 import type { ItemType } from '../../config'
 import { seededRandom } from '../../lib/math'
+import { remotes } from '../../net/remotes'
 import { player } from '../../player/runtime'
+import { requestSeat, seatRequest } from '../../player/zone'
 import { useBulteok } from '../../store/bulteokStore'
 import { SEAFOOD_GEOMETRY, SEAFOOD_MATERIAL } from '../sea/seafood/models'
 import { rockGeometry, ROCK_MAT } from '../sea/Coast'
@@ -75,10 +77,56 @@ function Wall() {
 const FLOOR_MAT = new MeshStandardMaterial({ color: '#6f6151', roughness: 1 })
 const SEAT_MAT = new MeshStandardMaterial({ color: '#4a4a4f', roughness: 0.95, flatShading: true })
 
-/** 바닥(평평한 흙) + 앉는 납작 돌 24개 */
+const SEAT_GLOW = new MeshBasicMaterial({ color: '#ffb25e', transparent: true, opacity: 0.3, blending: AdditiveBlending, depthWrite: false })
+const SEAT_RING = new MeshBasicMaterial({
+  color: '#ffb766', transparent: true, opacity: 0.35, blending: AdditiveBlending, depthWrite: false, side: DoubleSide,
+})
+
+/** 내 화면에서 이 자리가 비어 있나 (아무도 앉아 있지 않고, 아무도 가는 중이 아니고, 내가 요청 중도 아님) */
+function seatFree(i: number) {
+  if (player.zone !== 'bulteok' || i < 0 || i >= 24) return false
+  if (player.seat === i || seatRequest.seat === i) return false
+  for (const rm of remotes.values()) if (rm.zone === 'bulteok' && rm.seat === i) return false
+  return true
+}
+
+/** 바닥(평평한 흙) + 앉는 납작 돌 24개. 빈자리에 마우스를 올리면 은은하게 빛나고, 누르면 걸어가 앉음 */
 function FloorAndSeats() {
   const seatGeo = useMemo(() => new DodecahedronGeometry(0.26, 0).scale(1.15, 0.45, 1), [])
   const ref = useRef<InstancedMesh>(null!)
+  const glow = useRef<Group>(null!)
+  const hover = useRef(-1)
+  const gl = useThree((s) => s.gl)
+  const setHover = (i: number) => {
+    hover.current = i
+    gl.domElement.style.cursor = i >= 0 ? 'pointer' : ''
+  }
+  const onMove = (e: ThreeEvent<PointerEvent>) => {
+    const i = e.instanceId ?? -1
+    setHover(e.pointerType === 'mouse' && seatFree(i) ? i : -1)
+  }
+  const onClick = (e: ThreeEvent<MouseEvent>) => {
+    // 시점을 끌다가 뗀 건 무시 (살짝 흔들린 탭은 허용)
+    if (e.delta > 8) return
+    const i = e.instanceId ?? -1
+    if (!seatFree(i)) return
+    e.stopPropagation()
+    requestSeat(i)
+    setHover(-1)
+  }
+  useFrame(({ clock }) => {
+    // 올려 둔 사이 누가 앉으면 바로 꺼짐
+    if (hover.current >= 0 && !seatFree(hover.current)) setHover(-1)
+    const i = hover.current
+    glow.current.visible = i >= 0
+    if (i < 0) return
+    const s = seatPose(i)
+    glow.current.position.set(s.x, s.stoneY + 0.04, s.z)
+    glow.current.rotation.y = i * 1.7
+    const k = 0.5 + 0.5 * Math.sin(clock.elapsedTime * 3.2)
+    SEAT_GLOW.opacity = 0.32 + 0.2 * k
+    SEAT_RING.opacity = 0.35 + 0.25 * k
+  })
   useLayoutEffect(() => {
     const o = new Object3D()
     for (let i = 0; i < 24; i++) {
@@ -95,7 +143,21 @@ function FloorAndSeats() {
       <mesh position={[B.x, B.y - 0.06, B.z]} material={FLOOR_MAT} receiveShadow>
         <cylinderGeometry args={[B.wallRadius + 0.3, B.wallRadius + 0.6, 0.16, 40]} />
       </mesh>
-      <instancedMesh ref={ref} args={[seatGeo, SEAT_MAT, 24]} castShadow receiveShadow />
+      <instancedMesh
+        ref={ref}
+        args={[seatGeo, SEAT_MAT, 24]}
+        castShadow
+        receiveShadow
+        onPointerMove={onMove}
+        onPointerOut={() => setHover(-1)}
+        onClick={onClick}
+      />
+      <group ref={glow} visible={false}>
+        <mesh geometry={seatGeo} material={SEAT_GLOW} scale={1.14} />
+        <mesh material={SEAT_RING} position={[0, -0.035, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.3, 0.46, 32]} />
+        </mesh>
+      </group>
     </>
   )
 }
@@ -433,10 +495,85 @@ function Basin() {
   )
 }
 
+/** 털썩 앉은 자리: 흙먼지가 동그랗게 퍼지고 작은 반짝임 몇 개 */
+const DUST_MAT = new MeshBasicMaterial({ color: '#c9b79a', transparent: true, opacity: 0.5, depthWrite: false })
+const PUFF_SPARK_MAT = new MeshBasicMaterial({ color: '#fff1c4', transparent: true, blending: AdditiveBlending, depthWrite: false })
+
+function SeatPuffs() {
+  const POOL = 4
+  const DUST = 10
+  const SPARK = 4
+  const puffs = useMemo(
+    () =>
+      Array.from({ length: POOL }, () => ({
+        life: -1,
+        o: new Vector3(),
+        parts: Array.from({ length: DUST + SPARK }, () => ({ a: 0, sp: 0, up: 0 })),
+      })),
+    [],
+  )
+  const refs = useRef<(Mesh | null)[]>([])
+  const dustGeo = useMemo(() => new SphereGeometry(0.05, 7, 5), [])
+  const sparkGeo = useMemo(() => new SphereGeometry(0.018, 6, 4), [])
+  const cursor = useRef(0)
+  useFrame(({ clock }, rawDt) => {
+    const dt = Math.min(rawDt, 0.05)
+    while (bulteokFx.puffs.length) {
+      const req = bulteokFx.puffs.shift()!
+      const p = puffs[cursor.current++ % POOL]
+      p.life = 0
+      p.o.set(req.x, req.y, req.z)
+      p.parts.forEach((q, i) => {
+        q.a = (i / DUST) * Math.PI * 2 + Math.random() * 0.5
+        q.sp = i < DUST ? 0.5 + Math.random() * 0.35 : 0.25 + Math.random() * 0.3
+        q.up = i < DUST ? 0.05 + Math.random() * 0.08 : 0.35 + Math.random() * 0.3
+      })
+    }
+    const t = clock.elapsedTime
+    puffs.forEach((p, pi) => {
+      if (p.life >= 0) p.life += dt
+      if (p.life > 0.9) p.life = -1
+      const u = Math.max(0, p.life) / 0.9
+      const out = 1 - (1 - u) ** 3
+      p.parts.forEach((q, i) => {
+        const m = refs.current[pi * (DUST + SPARK) + i]
+        if (!m) return
+        m.visible = p.life >= 0
+        if (!m.visible) return
+        const dust = i < DUST
+        const r = 0.28 + q.sp * out * (dust ? 0.75 : 1)
+        m.position.set(p.o.x + Math.cos(q.a) * r, p.o.y + q.up * out * (dust ? 1 : 1.6) - (dust ? 0 : 0.25 * u * u), p.o.z + Math.sin(q.a) * r)
+        m.scale.setScalar(dust ? (0.6 + 1.1 * out) * (1 - u * 0.5) : (1 - u) * (0.7 + 0.3 * Math.sin(t * 30 + i)))
+      })
+    })
+    // 먼지는 같이 옅어짐 (한 번에 하나쯤 터지므로 재질 하나로)
+    const newest = Math.max(...puffs.map((p) => (p.life >= 0 ? 1 - p.life / 0.9 : 0)))
+    DUST_MAT.opacity = 0.5 * newest
+  })
+  return (
+    <>
+      {puffs.map((p, pi) =>
+        p.parts.map((_, i) => (
+          <mesh
+            key={`${pi}-${i}`}
+            ref={(m) => {
+              refs.current[pi * (DUST + SPARK) + i] = m
+            }}
+            geometry={i < DUST ? dustGeo : sparkGeo}
+            material={i < DUST ? DUST_MAT : PUFF_SPARK_MAT}
+            visible={false}
+          />
+        )),
+      )}
+    </>
+  )
+}
+
 export function Bulteok() {
   return (
     <>
       <FloorAndSeats />
+      <SeatPuffs />
       <Wall />
       <Campfire />
       <Basin />

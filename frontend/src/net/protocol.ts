@@ -65,6 +65,8 @@ export type ClientMessage =
   | { t: 'act'; a: ActionType; item?: ItemType }
   | { t: 'zone'; to: Zone }
   | { t: 'prep'; item: ItemType; how?: 'tap' }
+  /** 불턱에서 이 자리로 옮겨 앉고 싶음 (서버가 승인하면 seat 방송) */
+  | { t: 'seat'; seat: number }
   | { t: 'ping'; ts: number }
 
 // ── 서버 → 클라이언트 ──
@@ -89,6 +91,10 @@ export type ServerMessage =
   | { t: 'prep'; id: number; item: ItemType; how: 'tap'; left?: number }
   /** 공동 대야. full 이면 다 같이 만세 → 잠시 뒤 비운 대야(round + 1) */
   | { t: 'basin'; fill: number; capacity: number; round: number; full?: boolean }
+  /** 누군가 자리를 옮기기 시작 (본인 포함): 각 화면이 from → to 같은 길을 걸음. from 이 24 이상이면 담 밖에서 */
+  | { t: 'seat'; id: number; from: number; to: number }
+  /** 그 자리는 이미 누가 있거나 가는 중 (본인에게만) */
+  | { t: 'seat_no'; seat: number }
   | ({ t: 'today' } & TodayStats)
   | { t: 'pong'; ts: number }
   | { t: 'err'; code: string; msg: string }

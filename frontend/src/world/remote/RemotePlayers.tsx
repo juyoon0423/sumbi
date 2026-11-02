@@ -11,7 +11,8 @@ import { drivePose, interpolate, remotes, useRemotes, type RemoteInfo } from '..
 import { onActEvent } from '../../player/actEvents'
 import { player } from '../../player/runtime'
 import { NameTag } from '../../ui/NameTag'
-import { seatPose } from '../bulteok/layout'
+import { driveSeat } from '../bulteok/seatMotion'
+import { audio } from '../../audio/AudioEngine'
 
 function RemoteHaenyeo({ info }: { info: RemoteInfo }) {
   const root = useRef<Group>(null!)
@@ -24,16 +25,13 @@ function RemoteHaenyeo({ info }: { info: RemoteInfo }) {
   useFrame(({ clock }, rawDt) => {
     if (!rm) return
     const dt = Math.min(rawDt, 0.05)
-    if (rm.zone === 'bulteok') {
-      // 불턱 자리에 앉아 있음
-      const s = seatPose(rm.seat)
-      rm.pos.set(s.x, s.y, s.z)
-      rm.yaw = s.yaw
-      rm.vel.set(0, 0, 0)
-    } else {
-      interpolate(rm, dt)
-    }
+    if (rm.zone !== 'bulteok') interpolate(rm, dt)
     drivePose(rm, dt)
+    if (rm.zone === 'bulteok') {
+      // 불턱: 자리에 앉아 있거나, 서버가 알려 준 대로 자리를 옮겨 걸음 (위치는 받지 않음)
+      rm.vel.set(0, 0, 0)
+      if (driveSeat(rm, dt)) audio.playPlop(Math.max(0, 1 - player.pos.distanceTo(rm.pos) / 9) * 0.35)
+    }
     // 손질 소리는 가까이(같은 불턱)에서만, 거리만큼 작게
     const events = advanceActs(rm.pose, dt)
     if (events.length) {

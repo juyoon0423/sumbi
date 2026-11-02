@@ -16,6 +16,9 @@ export function startAct(pose: HaenyeoPose, act: SitAct, item: ItemType | null =
   pose.actItem = item
 }
 
+/** "앗" 반응 길이 (초) */
+export const OOPS_DURATION = 1.1
+
 const crossed = (prev: number, now: number, at: number) => prev < at && now >= at
 
 /** 시간 진행 + 이번 프레임에 일어난 순간들 */
@@ -26,6 +29,10 @@ export function advanceActs(pose: HaenyeoPose, dt: number): ActEvent[] {
     if (pose.celebrateTime > CONFIG.celebrateDuration) pose.celebrateTime = -1
   }
   if (pose.breatheTime >= 0) pose.breatheTime += dt
+  if (pose.oopsTime >= 0) {
+    pose.oopsTime += dt
+    if (pose.oopsTime > OOPS_DURATION) pose.oopsTime = -1
+  }
   if (!pose.act) return out
   const prev = pose.actTime
   pose.actTime += dt

@@ -82,7 +82,8 @@ if (import.meta.env.DEV) {
     import('../player/zone'),
     import('../world/time/env'),
     import('../store/sessionStore'),
-  ]).then(([rt, sf, inp, rm, bt, zone, time, session]) => {
+    import('../world/bulteok/layout'),
+  ]).then(([rt, sf, inp, rm, bt, zone, time, session, layout]) => {
     ;(window as unknown as Record<string, unknown>).__sumbi = {
       player: rt.player,
       cameraRig: rt.cameraRig,
@@ -92,6 +93,16 @@ if (import.meta.env.DEV) {
       game: useGame,
       bulteok: bt.useBulteok,
       travel: zone.travel,
+      /** 불턱 빈자리 누르기: seat(5) */
+      seat: zone.requestSeat,
+      seatPose: layout.seatPose,
+      /** 화면 좌표 (CSS px) */
+      toScreen: (x: number, y: number, z: number) => {
+        const cam = rt.view.camera
+        if (!cam) return null
+        const v = cam.position.clone().set(x, y, z).project(cam)
+        return { x: ((v.x + 1) / 2) * window.innerWidth, y: ((1 - v.y) / 2) * window.innerHeight }
+      },
       net,
       /** 시간대 고정: setTime('night') · setTime(21.5) · setTime(null) = 실제 한국 시간 */
       setTime: time.setTimeOverride,

@@ -2,9 +2,11 @@ import { Vector3 } from 'three'
 import { create } from 'zustand'
 import { CONFIG, type ItemType } from '../config'
 import { startAct } from '../haenyeo/acts'
-import { createPose, setState, type HaenyeoPose } from '../haenyeo/types'
+import { createPose, LAND_STATES, setState, type HaenyeoPose } from '../haenyeo/types'
 import { fx } from '../player/runtime'
 import { restingTewak } from '../world/bulteok/layout'
+import { beginSeatWalk } from '../world/bulteok/seatMotion'
+import type { SeatWalk } from '../world/bulteok/seatWalk'
 import type { LookInfo, PlayerInfo, Vec3, Zone } from './protocol'
 
 // 다른 해녀들. 렌더링할 목록(누가 있는지, 닉네임·꾸미기)은 zustand,
@@ -34,6 +36,8 @@ export interface RemoteRuntime {
   zone: Zone
   /** 불턱 자리 (바다면 -1) */
   seat: number
+  /** 불턱에서 자리를 옮겨 걷는 중 */
+  walk: SeatWalk | null
 }
 
 export const remotes = new Map<number, RemoteRuntime>()
@@ -70,6 +74,7 @@ function makeRuntime(p: PlayerInfo): RemoteRuntime {
     tewak: { pos: new Vector3(x + Math.sin(yaw) * 0.47, 0, z + Math.cos(yaw) * 0.47), attached: !underwater, rest: false },
     zone: 'sea',
     seat: -1,
+    walk: null,
   }
   if (p.zone === 'bulteok') {
     setRemoteZone(rm, 'bulteok', p.seat ?? 0)
@@ -84,6 +89,7 @@ function setRemoteZone(rm: RemoteRuntime, zone: Zone, seat?: number, p?: Vec3) {
   const pose = rm.pose
   pose.act = null
   pose.breatheTime = -1
+  rm.walk = null
   if (zone === 'bulteok') {
     rm.seat = seat ?? 0
     rm.underwater = false
@@ -109,6 +115,13 @@ function setRemoteZone(rm: RemoteRuntime, zone: Zone, seat?: number, p?: Vec3) {
 export function applyZone(id: number, zone: Zone, seat?: number, p?: Vec3) {
   const rm = remotes.get(id)
   if (rm) setRemoteZone(rm, zone, seat, p)
+}
+
+/** 다른 해녀가 자리를 옮기기 시작: 같은 길을 같은 걸음으로 */
+export function applySeatMove(id: number, from: number, to: number) {
+  const rm = remotes.get(id)
+  if (!rm || rm.zone !== 'bulteok') return
+  beginSeatWalk(rm, from, to)
 }
 
 /** 누군가 손질 시작 */
@@ -253,14 +266,10 @@ export function drivePose(rm: RemoteRuntime, dt: number) {
   const vy = rm.vel.y
   pose.move += (Math.min(1, hs / 2) - pose.move) * Math.min(1, dt * 6)
   const st = pose.stateTime
-  if (rm.zone === 'bulteok') {
-    setState(pose, 'sit')
-    return
-  }
+  // 불턱 자세는 RemotePlayers 가 driveSeat 로 정함
+  if (rm.zone === 'bulteok') return
+  if (LAND_STATES.has(pose.state)) setState(pose, 'surfaceIdle')
   switch (pose.state) {
-    case 'sit':
-      setState(pose, 'surfaceIdle')
-      break
     case 'entering':
       if (st > CONFIG.enterDuration) setState(pose, 'descending')
       break

@@ -3,6 +3,7 @@ import { nickOf } from '../haenyeo/customize'
 import { generateNickname } from '../lib/nickname'
 import { kstDateKey } from '../lib/today'
 import { nextBasinCapacity, seaReturn } from '../world/bulteok/layout'
+import { planWalk, walkDuration } from '../world/bulteok/seatWalk'
 import { Emitter, type NetClient } from './NetClient'
 import type { ClientMessage, HelloMessage, ItemCounts, TodayStats } from './protocol'
 
@@ -31,6 +32,8 @@ export class OfflineNetClient implements NetClient {
   private basin = { fill: 0, capacity: nextBasinCapacity(1), round: 1, full: false }
   private prepUntil = 0
   private restUntil = 0
+  private seat = -1
+  private walkUntil = 0
 
   constructor(opts: Options) {
     this.opts = opts
@@ -64,17 +67,33 @@ export class OfflineNetClient implements NetClient {
     if (msg.t === 'zone') {
       window.setTimeout(() => {
         if (msg.to === 'bulteok') {
+          this.seat = 0
           this.emitter.emit({ t: 'zone', id: SELF_ID, zone: 'bulteok', seat: 0 })
           this.emitBasin()
         } else {
+          this.seat = -1
           this.emitter.emit({ t: 'zone', id: SELF_ID, zone: 'sea', p: seaReturn(SELF_ID) })
         }
       }, 60)
       return
     }
+    if (msg.t === 'seat') {
+      // 혼자라 빈자리는 다 비어 있음 (서버 Room.requestSeat 흉내)
+      const now = Date.now()
+      if (this.seat < 0 || msg.seat === this.seat) return
+      if (msg.seat < 0 || msg.seat >= 24 || now < this.prepUntil || now < this.restUntil) {
+        window.setTimeout(() => this.emitter.emit({ t: 'seat_no', seat: msg.seat }), 40)
+        return
+      }
+      const from = this.seat
+      this.seat = msg.seat
+      this.walkUntil = now + walkDuration(planWalk(from, msg.seat)) * 1000
+      window.setTimeout(() => this.emitter.emit({ t: 'seat', id: SELF_ID, from, to: msg.seat }), 40)
+      return
+    }
     if (msg.t === 'prep') {
       const now = Date.now()
-      if (now < this.prepUntil || now < this.restUntil) return
+      if (now < this.prepUntil || now < this.restUntil || now < this.walkUntil) return
       this.prepUntil = now + CONFIG.prepDuration * 1000
       this.emitter.emit({ t: 'prep', id: SELF_ID, item: msg.item, how: 'tap' })
       window.setTimeout(() => this.fillBasin(), CONFIG.prepDuration * 1000)

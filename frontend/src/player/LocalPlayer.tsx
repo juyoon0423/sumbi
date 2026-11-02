@@ -18,7 +18,7 @@ import { useCustomize } from '../store/customizeStore'
 import { useGame } from '../store/gameStore'
 import { useSession } from '../store/sessionStore'
 import { NameTag } from '../ui/NameTag'
-import { seatPose } from '../world/bulteok/layout'
+import { driveSeat } from '../world/bulteok/seatMotion'
 import { terrainY } from '../world/terrain'
 import { waveHeight } from '../world/sea/waves'
 import { collect, findHarvestable, seafood } from '../world/sea/seafood/seafoodState'
@@ -81,11 +81,10 @@ export function LocalPlayer() {
     for (const ev of advanceActs(pose, dt)) onActEvent(ev, 1, pose.actItem, p.pos, p.yaw, true)
 
     if (p.zone === 'bulteok') {
-      // 불턱: 자리에 앉아 있음 (이동·잠수 없음)
-      const seat = seatPose(p.seat)
-      p.pos.set(seat.x, seat.y, seat.z)
-      p.yaw = seat.yaw
-      setState(pose, 'sit')
+      // 불턱: 자리에 앉아 있음 (이동·잠수 없음). 빈자리를 누르면 서버 승인 뒤 걸어가 앉음
+      const walking = !!p.walk
+      if (driveSeat(p, dt)) audio.playPlop(0.45)
+      if (walking && !p.walk) p.settledAt = performance.now()
       p.breath = Math.min(1, p.breath + dt / CONFIG.breathRecoverTime)
     } else {
     // 숨 고르기: 움직이거나 잠수하면 멈춤 (멈춘 뒤 상태 머신이 평소대로)

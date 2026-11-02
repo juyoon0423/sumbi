@@ -8,7 +8,9 @@ import { GEO, HEAD_R, HEAD_SCALE, HEAD_Y, headSurfaceZ } from './geometries'
 import type { HaenyeoLook } from './look'
 import { MAT } from './materials'
 import { TOOL_GEO, TOOL_MAT } from './tools'
-import { breatheAmount, type HaenyeoPose } from './types'
+import { WALK } from '../world/bulteok/seatWalk'
+import { OOPS_DURATION } from './acts'
+import { breatheAmount, LAND_STATES, type HaenyeoPose } from './types'
 
 // 기본 도형으로 조합한 2~2.5등신 해녀 + 절차적 애니메이션.
 // 원점 = 몸 중심, 앞 = +z. 전체 키 ≈ 1.15, 머리 높이 ≈ 0.6 (약 절반)
@@ -162,6 +164,14 @@ function sitAct(pose: HaenyeoPose, tg: Target, face: Face, t: number): Arms | nu
   return null
 }
 
+/** 앉거나 서서 쉬는 동안 가끔: 고개 갸웃 / 두리번 / 눈웃음 */
+function idleGesture(a: Anim, tg: Target, face: Face) {
+  const g = a.gesture ? Math.min(1, a.gestureT / 1.6) : 0
+  if (a.gesture === 'tilt') tg.headRoll = 0.3 * hump(g)
+  if (a.gesture === 'look') tg.headYaw = Math.sin(g * Math.PI * 2) * 0.55 * Math.sin(Math.PI * g)
+  if (a.gesture === 'hug') face.eyes = hump(g) > 0.3 ? 'happy' : 'dot'
+}
+
 function computeTarget(pose: HaenyeoPose, a: Anim, t: number): { tg: Target; face: Face; arms: Arms | null; breathe: number } {
   const st = pose.stateTime
   const lowBreath = pose.breath < CONFIG.lowBreath
@@ -258,11 +268,50 @@ function computeTarget(pose: HaenyeoPose, a: Anim, t: number): { tg: Target; fac
         ...tg, pitch: -0.06, headTilt: 0.06, armX: -1.25 + Math.sin(t * 2.6) * 0.05, armZ: -0.18 + Math.sin(t * 5.2) * 0.04,
         kickAmp: 0, sit: 1,
       }
-      const g = a.gesture ? Math.min(1, a.gestureT / 1.6) : 0
-      if (a.gesture === 'tilt') tg.headRoll = 0.3 * hump(g)
-      if (a.gesture === 'look') tg.headYaw = Math.sin(g * Math.PI * 2) * 0.55 * Math.sin(Math.PI * g)
-      if (a.gesture === 'hug') face.eyes = hump(g) > 0.3 ? 'happy' : 'dot'
+      idleGesture(a, tg, face)
       if (pose.act) arms = sitAct(pose, tg, face, t)
+      break
+    }
+    case 'stand': {
+      // 담 밖에 서서 모닥불 쪽으로 손 쬐기 (자리가 다 찼을 때)
+      tg = {
+        ...tg, pitch: -0.04, headTilt: 0.05, armX: -1.3 + Math.sin(t * 2.6) * 0.05, armZ: -0.2 + Math.sin(t * 5.2) * 0.04,
+        kickAmp: 0, sit: 0,
+      }
+      idleGesture(a, tg, face)
+      break
+    }
+    case 'rise': {
+      // 엉덩이를 들며 일어남: 앞으로 살짝 숙였다가 두 팔을 들고 작은 기지개
+      const k = Math.min(1, st / WALK.rise)
+      tg = {
+        ...tg, sit: 1 - smoothstep(0.05, 0.7, k), pitch: 0.3 * hump(Math.min(1, k * 1.6)) - 0.1 * hump((k - 0.5) / 0.5),
+        armX: -0.5, armZ: 0.1 + 1.1 * hump((k - 0.35) / 0.65), kickAmp: 0, stretch: 1 + 0.09 * hump((k - 0.4) / 0.6),
+      }
+      if (k > 0.45) {
+        face.eyes = 'line'
+        face.mouth = 'o'
+      }
+      break
+    }
+    case 'walk': {
+      // 짧은 다리로 뒤뚱뒤뚱: 몸을 좌우로 흔들고, 왼팔은 흔들고 오른팔로는 테왁을 끼고
+      const ph = a.kickPhase * Math.PI * 2
+      const m = pose.move
+      tg = {
+        ...tg, pitch: 0.07 * m, roll: Math.sin(ph) * (0.07 + 0.08 * m), headRoll: -Math.sin(ph) * 0.05, headTilt: 0.02,
+        armX: -0.3, armZ: 0.4, kickAmp: 0.32 + 0.3 * m, kickFreq: 1.9, frog: 0, sit: 0,
+      }
+      arms = { lx: -0.25 + Math.sin(ph) * 0.4 * m, lz: 0.42, rx: -0.45, rz: -0.62 }
+      if (m > 0.6) face.mouth = 'smile'
+      break
+    }
+    case 'settle': {
+      // 콩 뛰었다 털썩 앉기
+      const landed = st >= WALK.land
+      tg = { ...tg, sit: landed ? 1 : smoothstep(0, WALK.land, st) * 0.7, pitch: landed ? -0.1 : 0.05, armX: -0.7, armZ: 0.55, kickAmp: 0 }
+      face.eyes = landed ? 'happy' : 'round'
+      face.mouth = 'smile'
       break
     }
     case 'sumbi': {
@@ -302,6 +351,18 @@ function computeTarget(pose: HaenyeoPose, a: Anim, t: number): { tg: Target; fac
     tg.headTilt = -0.15
     face.eyes = 'happy'
     face.mouth = Math.sin(ct * 5) > 0 ? 'o' : 'smile'
+  }
+
+  // "앗": 원하던 자리를 다른 사람이 먼저. 그 자리 쪽으로 고개를 돌리고 동그란 눈
+  if (pose.oopsTime >= 0) {
+    const o = pose.oopsTime / OOPS_DURATION
+    const w = smoothstep(0, 0.12, o) * (1 - smoothstep(0.75, 1, o))
+    tg.headYaw = tg.headYaw * (1 - w) + pose.oopsYaw * 0.85 * w
+    tg.headTilt -= 0.12 * w
+    if (o < 0.75) {
+      face.eyes = 'round'
+      face.mouth = 'o'
+    }
   }
 
   // 숨이 부족하면 볼이 살짝 부풀고 땀 한 방울
@@ -494,7 +555,7 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
     a.happyT = Math.max(0, a.happyT - dt)
 
     // 대기 몸짓 스케줄
-    if ((pose.state === 'surfaceIdle' && pose.breatheTime < 0) || (pose.state === 'sit' && !pose.act)) {
+    if ((pose.state === 'surfaceIdle' && pose.breatheTime < 0) || (pose.state === 'sit' && !pose.act) || pose.state === 'stand') {
       if (a.gesture) {
         a.gestureT += dt
         if (a.gestureT > 1.6) a.gesture = null
@@ -555,7 +616,21 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
     }
     // 전복을 "뽁" 떼어낸 순간 살짝 들썩
     if (pose.act === 'prep' && pose.actItem === 'abalone') popY += 0.04 * hump((pose.actTime - 1.3) / 0.25)
-    pop.current.position.y = popY + (pose.state === 'sit' ? 0 : Math.sin(t * 2.2) * 0.012)
+    // 털썩 앉기: 닿는 순간 납작 눌렸다가 살짝 되튐
+    if (pose.state === 'settle') {
+      const u = pose.stateTime - WALK.land
+      if (u < 0) stretch *= 1 + 0.05 * hump(pose.stateTime / WALK.land)
+      else stretch *= 1 - 0.2 * hump(Math.min(1, u / 0.2)) + 0.06 * hump((u - 0.16) / 0.14)
+    }
+    // 걸음마다 통통
+    if (pose.state === 'walk') popY += Math.abs(Math.sin(a.kickPhase * Math.PI * 2)) * 0.03 * pose.move
+    // "앗": 움찔
+    if (pose.oopsTime >= 0) {
+      const o = Math.min(1, pose.oopsTime / 0.3)
+      popY += 0.04 * hump(o)
+      stretch *= 1 + 0.05 * hump(o)
+    }
+    pop.current.position.y = popY + (LAND_STATES.has(pose.state) ? 0 : Math.sin(t * 2.2) * 0.012)
     // 숨 고르기: 들이쉬면 몸이 동그랗게 부풀고 내쉬면 가라앉음
     stretch *= 1 + 0.045 * a.breathe
     const side = (1 / Math.sqrt(stretch)) * (1 + 0.07 * a.breathe)

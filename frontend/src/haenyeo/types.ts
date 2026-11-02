@@ -12,6 +12,13 @@ export type HaenyeoState =
   | 'ascending'
   | 'sumbi'
   | 'sit' // 불턱에 앉아 불 쬐기
+  | 'rise' // 자리에서 일어나기
+  | 'walk' // 불턱에서 뒤뚱뒤뚱 걷기 (제자리에서 돌기 포함)
+  | 'settle' // 털썩 앉기
+  | 'stand' // 담 밖에 서서 불 쬐기 (자리가 다 찼을 때)
+
+/** 땅 위(불턱) 자세: 바다 위처럼 둥실거리지 않음 */
+export const LAND_STATES: ReadonlySet<HaenyeoState> = new Set(['sit', 'rise', 'walk', 'settle', 'stand'])
 
 export const UNDERWATER_STATES: ReadonlySet<HaenyeoState> = new Set([
   'entering',
@@ -47,6 +54,10 @@ export interface HaenyeoPose {
   breatheTime: number
   /** 대야가 가득 차서 만세 시작 후 지난 시간(초). 없으면 -1 */
   celebrateTime: number
+  /** 원하는 자리를 다른 사람이 먼저 잡음: "앗" 반응 시작 후 지난 시간(초). 없으면 -1 */
+  oopsTime: number
+  /** "앗" 하며 돌아보는 쪽 (몸 기준 각도) */
+  oopsYaw: number
 }
 
 export type SitAct = 'prep' | 'tangerine' | 'doze'
@@ -54,7 +65,7 @@ export type SitAct = 'prep' | 'tangerine' | 'doze'
 export function createPose(): HaenyeoPose {
   return {
     state: 'surfaceIdle', stateTime: 0, move: 0, waveTime: -1, breath: 1, heldItem: null, cheerTime: -1,
-    act: null, actTime: 0, actItem: null, breatheTime: -1, celebrateTime: -1,
+    act: null, actTime: 0, actItem: null, breatheTime: -1, celebrateTime: -1, oopsTime: -1, oopsYaw: 0,
   }
 }
 

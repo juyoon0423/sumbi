@@ -4,7 +4,7 @@ import { CONFIG, ITEM_LABEL, withObjectParticle, type ItemType } from '../config
 import { startAct } from '../haenyeo/acts'
 import { sanitizeCustomization } from '../haenyeo/customize'
 import { cameraRig, player } from '../player/runtime'
-import { enterBulteokLocal, returnToSeaLocal } from '../player/zone'
+import { denyLocalSeat, enterBulteokLocal, returnToSeaLocal, startLocalSeatWalk } from '../player/zone'
 import { useBubbles } from '../store/bubbleStore'
 import { useBulteok } from '../store/bulteokStore'
 import { bulteokFx } from '../world/bulteok/bulteokFx'
@@ -15,7 +15,7 @@ import { useToasts } from '../store/toastStore'
 import { net } from '.'
 import { buildHello } from './hello'
 import type { ServerMessage } from './protocol'
-import { applyEvent, applyPrep, applySnap, applyZone, remoteNick, remotes, useRemotes } from './remotes'
+import { applyEvent, applyPrep, applySeatMove, applySnap, applyZone, remoteNick, remotes, useRemotes } from './remotes'
 
 /** 다른 해녀의 행동 → 토스트 문구. 잠수·상승은 너무 잦아서 알리지 않음 */
 export function actionText(nick: string, msg: Extract<ServerMessage, { t: 'evt' }>): string | null {
@@ -146,6 +146,13 @@ export function useNetBridge() {
           }
           break
         }
+        case 'seat':
+          if (msg.id === game.selfId) startLocalSeatWalk(msg.from, msg.to)
+          else applySeatMove(msg.id, msg.from, msg.to)
+          break
+        case 'seat_no':
+          denyLocalSeat(msg.seat)
+          break
         case 'basin': {
           const was = useBulteok.getState().basin
           useBulteok.getState().setBasin({ fill: msg.fill, capacity: msg.capacity, round: msg.round, full: !!msg.full })

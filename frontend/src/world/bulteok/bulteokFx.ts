@@ -6,4 +6,6 @@ export const bulteokFx = {
   tosses: [] as { from: Vector3; item: ItemType; mine: boolean }[],
   /** 가득 참 연출 요청 */
   burst: false,
+  /** 털썩 앉은 자리: 흙먼지 + 작은 반짝임 */
+  puffs: [] as { x: number; y: number; z: number }[],
 }
