@@ -13,13 +13,18 @@ const GEO = {
 }
 
 /** 주황 테왁 + 아래 망사리. 위치는 소유자(LocalPlayer, 원격 플레이어)가 계산해 넣는다 */
-export function Tewak({ state, material }: { state: { pos: Vector3 }; material: Material }) {
+export function Tewak({ state, material }: { state: { pos: Vector3; rest?: boolean }; material: Material }) {
   const ref = useRef<Group>(null!)
 
   useFrame(({ clock }) => {
     const { pos } = state
     const t = clock.elapsedTime
     ref.current.position.copy(pos)
+    if (state.rest) {
+      // 불턱 바닥에 내려놓은 테왁
+      ref.current.rotation.set(0.12, 0.6, 0.05)
+      return
+    }
     // 파도 기울기에 맞춰 살짝 기울어짐
     const e = 0.4
     const sx = (waveHeight(pos.x + e, pos.z, t) - waveHeight(pos.x - e, pos.z, t)) / (2 * e)

@@ -2,6 +2,7 @@ package com.sumbi.stats;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.sumbi.MutableClock;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -10,30 +11,6 @@ import java.time.ZonedDateTime;
 import org.junit.jupiter.api.Test;
 
 class InMemoryDailyStatsTest {
-    /** 바꿀 수 있는 시계 */
-    static class MutableClock extends Clock {
-        Instant now;
-
-        MutableClock(Instant now) {
-            this.now = now;
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return ZoneOffset.UTC;
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            return Clock.fixed(now, zone);
-        }
-
-        @Override
-        public Instant instant() {
-            return now;
-        }
-    }
-
     @Test
     void 같은_토큰은_한_번만_세고_채집을_더함() {
         var s = new InMemoryDailyStats(Clock.systemUTC());

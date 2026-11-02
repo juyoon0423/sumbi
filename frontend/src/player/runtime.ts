@@ -15,7 +15,12 @@ export const player = {
   diveLock: false,
   forcedAscend: false,
   harvestItemId: -1,
-  tewak: { pos: new Vector3(0, 0, 7.5), attached: true },
+  /** rest: 불턱에서 바닥에 내려놓음 (파도에 기울지 않음) */
+  tewak: { pos: new Vector3(0, 0, 7.5), attached: true, rest: false },
+  /** sea | bulteok */
+  zone: 'sea' as 'sea' | 'bulteok',
+  /** 불턱 자리 (바다면 -1) */
+  seat: -1,
 }
 
 /** 카메라 리그 상태 (이동 방향 계산에 필요) */
@@ -25,6 +30,8 @@ export const cameraRig = {
   pitch: 0.42,
   distance: 5.2,
   lastDragAt: -Infinity,
+  /** 다음 프레임에 카메라를 보간 없이 바로 옮김 (구역 이동) */
+  snap: false,
 }
 
 /** 이펙트 요청 큐 (LocalPlayer → 이펙트 컴포넌트) */

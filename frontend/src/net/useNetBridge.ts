@@ -1,15 +1,20 @@
 import { useEffect } from 'react'
 import { audio } from '../audio/AudioEngine'
-import { ITEM_LABEL, withObjectParticle } from '../config'
+import { CONFIG, ITEM_LABEL, withObjectParticle, type ItemType } from '../config'
+import { startAct } from '../haenyeo/acts'
 import { sanitizeCustomization } from '../haenyeo/customize'
 import { cameraRig, player } from '../player/runtime'
+import { enterBulteokLocal, returnToSeaLocal } from '../player/zone'
+import { useBubbles } from '../store/bubbleStore'
+import { useBulteok } from '../store/bulteokStore'
+import { bulteokFx } from '../world/bulteok/bulteokFx'
 import { useCustomize } from '../store/customizeStore'
 import { useGame } from '../store/gameStore'
 import { useToasts } from '../store/toastStore'
 import { net } from '.'
 import { buildHello } from './hello'
 import type { ServerMessage } from './protocol'
-import { applyEvent, applySnap, remoteNick, remotes, useRemotes } from './remotes'
+import { applyEvent, applyPrep, applySnap, applyZone, remoteNick, remotes, useRemotes } from './remotes'
 
 /** 다른 해녀의 행동 → 토스트 문구. 잠수·상승은 너무 잦아서 알리지 않음 */
 export function actionText(nick: string, msg: Extract<ServerMessage, { t: 'evt' }>): string | null {
@@ -20,9 +25,32 @@ export function actionText(nick: string, msg: Extract<ServerMessage, { t: 'evt' 
       return `${nick}님이 손 흔들어 인사했어요`
     case 'harvest':
       return msg.item ? `${nick}님이 ${withObjectParticle(ITEM_LABEL[msg.item])} 땄어요` : null
+    case 'tangerine':
+      return `${nick}님이 귤을 까먹어요`
+    case 'doze':
+      return `${nick}님이 꾸벅꾸벅 졸아요`
     default:
       return null
   }
+}
+
+/** 손질 알림 문구 (PLAN 5.3) */
+export function prepText(item: ItemType) {
+  switch (item) {
+    case 'conch':
+      return '소라를 톡톡 두드렸어요'
+    case 'abalone':
+      return '전복을 떼어냈어요'
+    case 'urchin':
+      return '성게 알을 꺼냈어요'
+  }
+}
+
+/** 대야가 가득 참: 불턱에 있는 해녀 모두 만세 */
+function celebrateAll() {
+  if (player.zone === 'bulteok') player.pose.celebrateTime = 0
+  for (const rm of remotes.values()) if (rm.zone === 'bulteok') rm.pose.celebrateTime = 0
+  bulteokFx.burst = true
 }
 
 /** 다른 해녀의 숨비소리: 거리만큼 작게, 카메라 기준 좌우로 */
@@ -64,6 +92,8 @@ export function useNetBridge() {
             player.tewak.pos.set(x + Math.sin(player.yaw) * 0.47, player.tewak.pos.y, z + Math.cos(player.yaw) * 0.47)
           }
           wasWelcomed = true
+          // 처음 들어오면 바다에서 시작 (재접속이면 서버가 불턱 자리를 다시 알려 줌)
+          if (player.zone === 'bulteok') returnToSeaLocal([player.pos.x, 0, player.pos.z])
           // 서버가 목록에 없는 값을 고쳤으면 그대로 받아들임
           const mine = useCustomize.getState().custom
           const [adj, ...rest] = msg.you.nick.split(' ')
@@ -86,12 +116,57 @@ export function useNetBridge() {
         case 'today':
           game.setToday({ divers: msg.divers, items: msg.items })
           break
+        case 'zone': {
+          if (msg.id === game.selfId) {
+            if (msg.zone === 'bulteok') {
+              enterBulteokLocal(msg.seat ?? 0)
+              useBulteok.getState().setServerLeft(msg.left ?? null)
+            } else {
+              returnToSeaLocal(msg.p)
+            }
+          } else {
+            applyZone(msg.id, msg.zone, msg.seat, msg.p)
+          }
+          break
+        }
+        case 'prep': {
+          if (msg.id === game.selfId) {
+            startAct(player.pose, 'prep', msg.item)
+            game.addPrepped(msg.item)
+            if (msg.left !== undefined) useBulteok.getState().setLeftOne(msg.item, msg.left)
+            useBulteok.getState().setBusyUntil(performance.now() + CONFIG.prepDuration * 1000)
+            useBulteok.getState().setDozing(false)
+            useBubbles.getState().sayself(prepText(msg.item), CONFIG.prepDuration * 1000)
+          } else {
+            applyPrep(msg.id, msg.item)
+            const nick = remoteNick(msg.id) ?? '이웃 해녀'
+            if (player.zone === 'bulteok' && game.phase === 'playing') useToasts.getState().push(`${nick}님이 ${prepText(msg.item)}`)
+          }
+          break
+        }
+        case 'basin': {
+          const was = useBulteok.getState().basin
+          useBulteok.getState().setBasin({ fill: msg.fill, capacity: msg.capacity, round: msg.round, full: !!msg.full })
+          if (msg.full && !(was.full && was.round === msg.round)) {
+            celebrateAll()
+            if (player.zone === 'bulteok') {
+              audio.playCelebrate()
+              useToasts.getState().push('대야가 가득 찼어요! 다 같이 만세')
+            }
+          }
+          break
+        }
+        case 'err':
+          if (msg.code === 'NO_ITEM') useBubbles.getState().sayself('바다에서 따 온 것만 손질할 수 있어요', 2600)
+          break
         case 'evt': {
           if (msg.id === game.selfId) break
           applyEvent(msg.id, msg.a, msg.item)
           const nick = remoteNick(msg.id) ?? msg.nick ?? '이웃 해녀'
           const text = actionText(nick, msg)
-          if (text && game.phase === 'playing') useToasts.getState().push(text)
+          // 쉬기 알림은 같은 불턱에 있을 때만
+          const restAct = msg.a === 'tangerine' || msg.a === 'doze'
+          if (text && game.phase === 'playing' && (!restAct || player.zone === 'bulteok')) useToasts.getState().push(text)
           if (msg.a === 'sumbi' && game.phase === 'playing') playRemoteSumbi(msg.id)
           break
         }

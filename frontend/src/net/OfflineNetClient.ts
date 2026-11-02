@@ -1,7 +1,8 @@
-import type { ItemType } from '../config'
+import { CONFIG, type ItemType } from '../config'
 import { nickOf } from '../haenyeo/customize'
 import { generateNickname } from '../lib/nickname'
 import { kstDateKey } from '../lib/today'
+import { nextBasinCapacity, seaReturn } from '../world/bulteok/layout'
 import { Emitter, type NetClient } from './NetClient'
 import type { ClientMessage, HelloMessage, ItemCounts, TodayStats } from './protocol'
 
@@ -26,6 +27,10 @@ export class OfflineNetClient implements NetClient {
   private timer: number | undefined
   private today: TodayStats
   private opts: Options
+  // 불턱 흉내: 혼자 쓰는 대야
+  private basin = { fill: 0, capacity: nextBasinCapacity(1), round: 1, full: false }
+  private prepUntil = 0
+  private restUntil = 0
 
   constructor(opts: Options) {
     this.opts = opts
@@ -56,6 +61,26 @@ export class OfflineNetClient implements NetClient {
   }
 
   send(msg: ClientMessage) {
+    if (msg.t === 'zone') {
+      window.setTimeout(() => {
+        if (msg.to === 'bulteok') {
+          this.emitter.emit({ t: 'zone', id: SELF_ID, zone: 'bulteok', seat: 0 })
+          this.emitBasin()
+        } else {
+          this.emitter.emit({ t: 'zone', id: SELF_ID, zone: 'sea', p: seaReturn(SELF_ID) })
+        }
+      }, 60)
+      return
+    }
+    if (msg.t === 'prep') {
+      const now = Date.now()
+      if (now < this.prepUntil || now < this.restUntil) return
+      this.prepUntil = now + CONFIG.prepDuration * 1000
+      this.emitter.emit({ t: 'prep', id: SELF_ID, item: msg.item, how: 'tap' })
+      window.setTimeout(() => this.fillBasin(), CONFIG.prepDuration * 1000)
+      return
+    }
+    if (msg.t === 'act' && msg.a === 'tangerine') this.restUntil = Date.now() + CONFIG.tangerineDuration * 1000
     if (msg.t === 'look') {
       this.emitter.emit({ t: 'look', id: SELF_ID, nick: nickOf(msg.nick), look: msg.look })
       return
@@ -63,6 +88,28 @@ export class OfflineNetClient implements NetClient {
     if (msg.t !== 'act') return
     this.emitter.emit({ t: 'evt', id: SELF_ID, a: msg.a, item: msg.item })
     if (msg.a === 'harvest' && msg.item) this.addHarvest(msg.item)
+  }
+
+  private emitBasin() {
+    const b = this.basin
+    this.emitter.emit({ t: 'basin', fill: b.fill, capacity: b.capacity, round: b.round, full: b.full || undefined })
+  }
+
+  /** 손질 하나가 대야에 들어감. 가득 차면 잠깐 축하하고 비움 (서버 Basin 과 같은 흐름) */
+  private fillBasin() {
+    const b = this.basin
+    if (b.full) return
+    b.fill += 1
+    if (b.fill >= b.capacity) {
+      b.full = true
+      this.emitBasin()
+      window.setTimeout(() => {
+        this.basin = { fill: 0, capacity: nextBasinCapacity(1), round: b.round + 1, full: false }
+        this.emitBasin()
+      }, 4000)
+      return
+    }
+    this.emitBasin()
   }
 
   private addHarvest(item: ItemType) {

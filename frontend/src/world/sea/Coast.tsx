@@ -11,9 +11,9 @@ import {
 import { seededRandom } from '../../lib/math'
 import { shoreZ, terrainY } from '../terrain'
 
-// 검은 현무암 바위, 멀리 한라산과 오름, 해안의 불턱 돌담(4단계에서 실제 공간이 됨)
+// 검은 현무암 바위, 멀리 한라산과 오름 (불턱 돌담은 world/bulteok)
 
-function rockGeometry(seed: number) {
+export function rockGeometry(seed: number) {
   const g = new IcosahedronGeometry(1, 1)
   const rand = seededRandom(seed)
   const pos = g.attributes.position
@@ -32,7 +32,7 @@ function rockGeometry(seed: number) {
   return g
 }
 
-const ROCK_MAT = new MeshStandardMaterial({ color: '#36363a', roughness: 0.95, flatShading: true })
+export const ROCK_MAT = new MeshStandardMaterial({ color: '#36363a', roughness: 0.95, flatShading: true })
 const ROCK_VARIANTS = 3
 
 interface RockPlacement {
@@ -108,34 +108,6 @@ function Rocks() {
   )
 }
 
-/** 해안에 보이는 둥근 돌담 (불턱 자리) */
-function BulteokPreview() {
-  const stones = useMemo(() => {
-    const rand = seededRandom(42)
-    const cx = 16
-    const cz = shoreZ(cx) - 9
-    const list: [number, number, number, number][] = []
-    for (let layer = 0; layer < 2; layer++) {
-      for (let i = 0; i < 18; i++) {
-        if (i === 0) continue // 입구
-        const a = (i / 18) * Math.PI * 2 + layer * 0.17
-        const x = cx + Math.cos(a) * 3.4
-        const z = cz + Math.sin(a) * 3.4
-        list.push([x, terrainY(x, z) + 0.25 + layer * 0.42, z, 0.36 + rand() * 0.12])
-      }
-    }
-    return list
-  }, [])
-  const geo = useMemo(() => rockGeometry(9), [])
-  return (
-    <>
-      {stones.map(([x, y, z, s], i) => (
-        <mesh key={i} geometry={geo} material={ROCK_MAT} position={[x, y, z]} scale={s} castShadow />
-      ))}
-    </>
-  )
-}
-
 /** 한라산 + 오름: 회전체(Lathe)로 완만한 순상화산 실루엣 */
 function Mountains() {
   const hallasan = useMemo(
@@ -183,7 +155,6 @@ export function Coast() {
   return (
     <>
       <Rocks />
-      <BulteokPreview />
       <Mountains />
     </>
   )

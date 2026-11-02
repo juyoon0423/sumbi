@@ -204,3 +204,166 @@ export function heartbeat(ctx: AudioContext, dest: AudioNode) {
     o.stop(t + delay + 0.18)
   }
 }
+
+// ── 불턱 ──
+
+/** 출력 볼륨을 곱하는 작은 게인 */
+function vol(ctx: AudioContext, dest: AudioNode, v: number) {
+  const g = ctx.createGain()
+  g.gain.value = v
+  g.connect(dest)
+  return g
+}
+
+/** 소라를 돌로 "톡" */
+export function tap(ctx: AudioContext, noise: AudioBuffer, dest: AudioNode, v = 1) {
+  const t = ctx.currentTime
+  const out = vol(ctx, dest, v)
+  const o = ctx.createOscillator()
+  o.type = 'triangle'
+  o.frequency.setValueAtTime(1900 + Math.random() * 300, t)
+  o.frequency.exponentialRampToValueAtTime(900, t + 0.05)
+  const g = ctx.createGain()
+  g.gain.setValueAtTime(0.18, t)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07)
+  o.connect(g).connect(out)
+  o.start(t)
+  o.stop(t + 0.08)
+  const n = noiseSource(ctx, noise)
+  const hp = ctx.createBiquadFilter()
+  hp.type = 'highpass'
+  hp.frequency.value = 3000
+  const ng = ctx.createGain()
+  ng.gain.setValueAtTime(0.12, t)
+  ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.03)
+  n.connect(hp).connect(ng).connect(out)
+  n.start(t, Math.random() * 2)
+  n.stop(t + 0.04)
+}
+
+/** 전복을 떼어낼 때 "뽁" */
+export function pop(ctx: AudioContext, dest: AudioNode, v = 1) {
+  const t = ctx.currentTime
+  const out = vol(ctx, dest, v)
+  const o = ctx.createOscillator()
+  o.frequency.setValueAtTime(260, t)
+  o.frequency.exponentialRampToValueAtTime(900, t + 0.06)
+  o.frequency.exponentialRampToValueAtTime(420, t + 0.13)
+  const g = ctx.createGain()
+  g.gain.setValueAtTime(0.0001, t)
+  g.gain.linearRampToValueAtTime(0.3, t + 0.015)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16)
+  o.connect(g).connect(out)
+  o.start(t)
+  o.stop(t + 0.18)
+}
+
+/** 성게를 반으로 "쩍" */
+export function crack(ctx: AudioContext, noise: AudioBuffer, dest: AudioNode, v = 1) {
+  const t = ctx.currentTime
+  const out = vol(ctx, dest, v)
+  const n = noiseSource(ctx, noise)
+  const bp = ctx.createBiquadFilter()
+  bp.type = 'bandpass'
+  bp.Q.value = 1.4
+  bp.frequency.value = 1500
+  const g = ctx.createGain()
+  g.gain.setValueAtTime(0.32, t)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12)
+  n.connect(bp).connect(g).connect(out)
+  n.start(t, Math.random() * 2)
+  n.stop(t + 0.14)
+}
+
+/** 냠 (귤 한 조각) */
+export function munch(ctx: AudioContext, noise: AudioBuffer, dest: AudioNode, v = 1) {
+  const t = ctx.currentTime
+  const out = vol(ctx, dest, v)
+  for (const d of [0, 0.11]) {
+    const n = noiseSource(ctx, noise)
+    const lp = ctx.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.frequency.value = 1200
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.0001, t + d)
+    g.gain.linearRampToValueAtTime(0.14, t + d + 0.015)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.08)
+    n.connect(lp).connect(g).connect(out)
+    n.start(t + d, Math.random() * 2)
+    n.stop(t + d + 0.1)
+  }
+}
+
+/** 대야에 "톡" (물에 떨어지는 소리) */
+export function plop(ctx: AudioContext, dest: AudioNode, v = 1) {
+  const t = ctx.currentTime
+  const out = vol(ctx, dest, v)
+  const o = ctx.createOscillator()
+  o.frequency.setValueAtTime(380, t)
+  o.frequency.exponentialRampToValueAtTime(1150, t + 0.08)
+  const g = ctx.createGain()
+  g.gain.setValueAtTime(0.0001, t)
+  g.gain.linearRampToValueAtTime(0.22, t + 0.01)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.13)
+  o.connect(g).connect(out)
+  o.start(t)
+  o.stop(t + 0.15)
+}
+
+/** 대야가 가득 참: 짧은 축하 아르페지오 */
+export function celebrate(ctx: AudioContext, dest: AudioNode) {
+  const t = ctx.currentTime
+  const notes = [784, 988, 1175, 1568, 1319, 1568]
+  notes.forEach((hz, i) => {
+    const at = t + i * 0.11
+    const o = ctx.createOscillator()
+    o.type = 'triangle'
+    o.frequency.value = hz
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.0001, at)
+    g.gain.linearRampToValueAtTime(0.09, at + 0.015)
+    g.gain.exponentialRampToValueAtTime(0.0001, at + (i === notes.length - 1 ? 0.9 : 0.35))
+    o.connect(g).connect(dest)
+    o.start(at)
+    o.stop(at + 1)
+  })
+}
+
+/**
+ * 모닥불: 낮게 깔리는 불 소리 + 가끔 타닥. level(0~1)로 크기 조절 (불에서 멀면 작게).
+ * 돌려주는 게인 노드의 gain 을 바꿔 크기를 조절한다.
+ */
+export function startFire(ctx: AudioContext, noise: AudioBuffer, dest: AudioNode) {
+  const level = ctx.createGain()
+  level.gain.value = 0
+  level.connect(dest)
+  const bed = noiseSource(ctx, noise, true)
+  const lp = ctx.createBiquadFilter()
+  lp.type = 'lowpass'
+  lp.frequency.value = 520
+  const bg = ctx.createGain()
+  bg.gain.value = 0.16
+  bed.connect(lp).connect(bg).connect(level)
+  bed.start(0, Math.random() * noise.duration)
+
+  const crackle = () => {
+    if (level.gain.value > 0.01) {
+      const t = ctx.currentTime
+      const n = noiseSource(ctx, noise)
+      const hp = ctx.createBiquadFilter()
+      hp.type = 'highpass'
+      hp.frequency.value = 1800 + Math.random() * 2500
+      const g = ctx.createGain()
+      const peak = 0.08 + Math.random() * 0.18
+      g.gain.setValueAtTime(peak, t)
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.015 + Math.random() * 0.04)
+      n.connect(hp).connect(g).connect(level)
+      n.start(t, Math.random() * 3)
+      n.stop(t + 0.07)
+    }
+    // 타닥타닥: 짧은 간격으로 몰렸다가 쉬기
+    window.setTimeout(crackle, Math.random() < 0.3 ? 40 + Math.random() * 60 : 120 + Math.random() * 650)
+  }
+  crackle()
+  return level
+}

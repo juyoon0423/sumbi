@@ -845,3 +845,134 @@ button {
   font-weight: 700;
   white-space: nowrap;
 }
+
+/* ── 불턱 (4단계) ── */
+.basket-items em.prepped {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: 2px;
+}
+.bulteok-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.prep-panel {
+  padding: 8px 10px 9px;
+  border-radius: 20px;
+}
+.prep-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dim);
+  padding: 0 6px 6px;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.prep-hint {
+  color: #ffd9a8;
+  font-weight: 600;
+}
+.prep-items {
+  display: flex;
+  gap: 6px;
+}
+.prep {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  column-gap: 7px;
+  align-items: center;
+  min-width: 104px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+}
+.prep .dot {
+  grid-row: span 2;
+}
+.prep b {
+  font-size: 17px;
+  justify-self: start;
+}
+.prep kbd {
+  display: none;
+}
+.prep:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+}
+.prep:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.prep.empty {
+  opacity: 0.45;
+}
+.dot.big {
+  width: 16px;
+  height: 16px;
+}
+.basin-card {
+  min-width: 220px;
+  margin-bottom: 8px;
+  padding: 10px 14px 11px;
+  border-radius: 16px;
+}
+.basin-round {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.basin-track {
+  height: 8px;
+  margin: 8px 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  overflow: hidden;
+}
+.basin-fill {
+  height: 100%;
+  transform-origin: left;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7fd6d0, #ffd27a);
+  transition: transform 0.6s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.basin-card.full {
+  box-shadow: 0 0 0 2px rgba(255, 220, 140, 0.6), 0 0 24px rgba(255, 200, 120, 0.45);
+}
+.zone-fade {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse at center, #1b3442 0%, #0b1820 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s ease;
+  color: var(--text-dim);
+  font-weight: 700;
+  font-size: 15px;
+}
+.zone-fade.on {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (max-width: 640px) {
+  .prep {
+    min-width: 0;
+    padding: 7px 10px;
+  }
+  .basin-card {
+    min-width: 0;
+  }
+}

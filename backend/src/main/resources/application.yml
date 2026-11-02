@@ -23,6 +23,11 @@ sumbi:
   today-interval-ms: 5000
   look-interval-ms: 2000
   harvest-interval-ms: 1000
+  bulteok:
+    prep-ms: 3000        # 프론트 손질 모션 길이와 같게 (config.ts prepDuration)
+    rest-ms: 4000        # 귤 까먹기
+    basin-capacity: ${SUMBI_BASIN_CAPACITY:20}   # 첫 대야. 비울 때마다 불턱 인원 × 4 (12~40)
+    basin-celebrate-ms: 4000
   sea:
     center-x: 0
     center-z: 8

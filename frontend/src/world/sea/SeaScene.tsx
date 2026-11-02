@@ -1,3 +1,4 @@
+import { Bulteok } from '../bulteok/Bulteok'
 import { Coast } from './Coast'
 import { Ocean } from './Ocean'
 import { SeafoodField } from './seafood/SeafoodField'
@@ -12,6 +13,7 @@ export function SeaScene() {
       <SkyAndLight />
       <Terrain />
       <Coast />
+      <Bulteok />
       <Seaweed />
       <SeafoodField />
       <Ocean />

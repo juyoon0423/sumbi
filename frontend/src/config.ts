@@ -24,6 +24,19 @@ export const CONFIG = {
   harvestShowEnd: 0.95, // 보여주기 끝 → 망사리에 넣기
   waveDuration: 1.3,
 
+  // 불턱 (서버 application.yml sumbi.bulteok 과 같게)
+  prepDuration: 3.0, // 손질 모션 길이 → 끝나면 대야에 쏙
+  prepToss: 2.55, // 손질한 해산물을 대야로 던지는 순간
+  tangerineDuration: 4.0,
+  celebrateDuration: 3.2, // 대야가 가득 찼을 때 만세
+
+  // 숨 고르기 (4초 들이쉬고 6초 내쉬기)
+  breatheIn: 4,
+  breatheOut: 6,
+  breatheRewardCycles: 3, // 이만큼 하면 그날 숨 최대치 +breatheBonus 초
+  breatheBonus: 2,
+  breatheBonusMax: 6,
+
   // 채집
   harvestRadius: 1.0,
   seafoodCount: 48,

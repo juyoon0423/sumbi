@@ -3,6 +3,7 @@ package com.sumbi.config;
 import com.sumbi.catalog.CustomizeCatalog;
 import com.sumbi.game.GameServer;
 import com.sumbi.room.MovementValidator;
+import com.sumbi.room.PrepLedger;
 import com.sumbi.room.Room;
 import com.sumbi.room.RoomManager;
 import com.sumbi.stats.DailyStats;
@@ -29,10 +30,17 @@ public class GameConfig {
     }
 
     @Bean
-    public RoomManager roomManager(SumbiProperties props) {
+    public PrepLedger prepLedger() {
+        return new PrepLedger(Clock.systemUTC());
+    }
+
+    @Bean
+    public RoomManager roomManager(SumbiProperties props, PrepLedger ledger) {
         MovementValidator movement = new MovementValidator(props.sea());
-        return new RoomManager(props.roomCapacity(),
-            id -> new Room(id, props.roomCapacity(), movement, props.lookIntervalMs(), props.harvestIntervalMs()));
+        SumbiProperties.Bulteok b = props.bulteok();
+        Room.Settings settings = new Room.Settings(props.roomCapacity(), props.lookIntervalMs(), props.harvestIntervalMs(),
+            b.prepMs(), b.restMs(), b.basinCapacity(), b.basinCelebrateMs());
+        return new RoomManager(props.roomCapacity(), id -> new Room(id, settings, movement, ledger));
     }
 
     @Bean

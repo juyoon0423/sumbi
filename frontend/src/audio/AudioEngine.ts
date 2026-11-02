@@ -27,6 +27,7 @@ class AudioEngine {
   private underwaterFilter!: BiquadFilterNode
   private files: Partial<Record<FileKey, AudioBuffer[]>> = {}
   private noise!: AudioBuffer
+  private fire: GainNode | null = null
 
   /** 사용자 클릭 안에서 호출해야 함 (브라우저 자동재생 정책) */
   async start() {
@@ -53,6 +54,12 @@ class AudioEngine {
 
     await this.loadFiles()
     this.startWaves()
+    this.fire = synth.startFire(ctx, this.noise, this.channels.sfx)
+  }
+
+  /** 모닥불 소리 크기 0~1 (불턱 장면이 거리에 따라 매 프레임 알려 줌) */
+  setFireLevel(level: number) {
+    if (this.ctx && this.fire) this.fire.gain.setTargetAtTime(level, this.ctx.currentTime, 0.2)
   }
 
   private applyVolumes(v: Volumes) {
@@ -162,6 +169,31 @@ class AudioEngine {
 
   playChime() {
     if (this.ctx) synth.chime(this.ctx, this.channels.sfx)
+  }
+
+  // ── 불턱 ──
+  playTap(v = 1) {
+    if (this.ctx && v > 0.02) synth.tap(this.ctx, this.noise, this.channels.sfx, v)
+  }
+
+  playPop(v = 1) {
+    if (this.ctx && v > 0.02) synth.pop(this.ctx, this.channels.sfx, v)
+  }
+
+  playCrack(v = 1) {
+    if (this.ctx && v > 0.02) synth.crack(this.ctx, this.noise, this.channels.sfx, v)
+  }
+
+  playMunch(v = 1) {
+    if (this.ctx && v > 0.02) synth.munch(this.ctx, this.noise, this.channels.sfx, v)
+  }
+
+  playPlop(v = 1) {
+    if (this.ctx && v > 0.02) synth.plop(this.ctx, this.channels.sfx, v)
+  }
+
+  playCelebrate() {
+    if (this.ctx) synth.celebrate(this.ctx, this.channels.sfx)
   }
 }
 

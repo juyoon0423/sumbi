@@ -16,6 +16,9 @@ import java.util.Map;
     @JsonSubTypes.Type(value = ServerMessage.Snap.class, name = "snap"),
     @JsonSubTypes.Type(value = ServerMessage.Evt.class, name = "evt"),
     @JsonSubTypes.Type(value = ServerMessage.Today.class, name = "today"),
+    @JsonSubTypes.Type(value = ServerMessage.ZoneChanged.class, name = "zone"),
+    @JsonSubTypes.Type(value = ServerMessage.Prep.class, name = "prep"),
+    @JsonSubTypes.Type(value = ServerMessage.Basin.class, name = "basin"),
     @JsonSubTypes.Type(value = ServerMessage.Pong.class, name = "pong"),
     @JsonSubTypes.Type(value = ServerMessage.Err.class, name = "err"),
 })
@@ -46,6 +49,18 @@ public sealed interface ServerMessage {
             return new Today(s.divers(), s.items());
         }
     }
+
+    /**
+     * 누군가 구역을 옮김 (본인 포함). 불턱이면 seat, 바다면 p(다시 들어갈 자리).
+     * left: 본인에게만, 앞으로 손질할 수 있는 개수
+     */
+    record ZoneChanged(int id, String zone, Integer seat, double[] p, Map<String, Integer> left) implements ServerMessage {}
+
+    /** 누군가 손질을 시작함 (본인 포함). left: 그 사람이 앞으로 손질할 수 있는 그 종류 개수 */
+    record Prep(int id, String item, String how, int left) implements ServerMessage {}
+
+    /** 공동 대야. full=true 면 다 같이 만세, 잠시 뒤 비운 대야(round+1) */
+    record Basin(int fill, int capacity, int round, Boolean full) implements ServerMessage {}
 
     record Pong(long ts) implements ServerMessage {}
 

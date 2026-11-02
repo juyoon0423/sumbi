@@ -1,13 +1,14 @@
 import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
-import type { Group, Mesh } from 'three'
+import { Quaternion, Vector3, type Group, type Mesh } from 'three'
 import { CONFIG, type ItemType } from '../config'
 import { damp, smoothstep } from '../lib/math'
 import { SEAFOOD_GEOMETRY, SEAFOOD_MATERIAL } from '../world/sea/seafood/models'
 import { GEO, HEAD_R, HEAD_SCALE, HEAD_Y, headSurfaceZ } from './geometries'
 import type { HaenyeoLook } from './look'
 import { MAT } from './materials'
-import type { HaenyeoPose } from './types'
+import { TOOL_GEO, TOOL_MAT } from './tools'
+import { breatheAmount, type HaenyeoPose } from './types'
 
 // 기본 도형으로 조합한 2~2.5등신 해녀 + 절차적 애니메이션.
 // 원점 = 몸 중심, 앞 = +z. 전체 키 ≈ 1.15, 머리 높이 ≈ 0.6 (약 절반)
@@ -30,6 +31,15 @@ interface Target {
   goggles: number // 0 = 이마 위, 1 = 눈 위
   stretch: number // 1 = 기본, >1 늘어남, <1 눌림
   cheeks: number // 0 = 평소, 1 = 빵빵
+  sit: number // 1 = 다리를 앞으로 뻗고 앉음
+}
+
+/** 양팔을 따로 움직이는 동작(손질·만세 등)의 팔 각도. l = 왼팔(+x), r = 오른팔(-x) */
+interface Arms {
+  lx: number
+  lz: number
+  rx: number
+  rz: number
 }
 
 interface Face {
@@ -41,7 +51,7 @@ interface Face {
 const BASE: Target = {
   pitch: 0.12, roll: 0, headTilt: 0, headYaw: 0, headRoll: 0,
   armX: -1.15, armZ: -0.35, kickAmp: 0.22, kickFreq: 1.8, frog: 0,
-  goggles: 0, stretch: 1, cheeks: 0,
+  goggles: 0, stretch: 1, cheeks: 0, sit: 0,
 }
 
 const ease = (x: number) => smoothstep(0, 1, x)
@@ -59,13 +69,106 @@ interface Anim extends Target {
   gestureT: number
   nextGesture: number
   nextBlink: number
+  /** 양팔 따로 움직이기: 현재 각도와 섞는 비율 */
+  arms: Arms
+  armsW: number
+  /** 숨 고르기로 부푼 정도 */
+  breathe: number
 }
 
-function computeTarget(pose: HaenyeoPose, a: Anim, t: number): { tg: Target; face: Face } {
+/** 불턱에서 앉아서 하는 동작 (손질 3종·귤 까먹기·졸기). 양팔을 따로 쓰면 그 각도를 돌려줌 */
+function sitAct(pose: HaenyeoPose, tg: Target, face: Face, t: number): Arms | null {
+  const st = pose.actTime
+  switch (pose.act) {
+    case 'prep': {
+      tg.headTilt = 0.35
+      face.eyes = 'round'
+      if (st >= CONFIG.prepToss) {
+        // 대야로 휙
+        const fl = hump(Math.min(1, (st - CONFIG.prepToss) / 0.45))
+        tg.headTilt = 0.05
+        face.eyes = 'happy'
+        face.mouth = 'smile'
+        return { lx: -1.25 - 0.6 * fl, lz: -0.2, rx: -1.25 - 0.6 * fl, rz: 0.2 }
+      }
+      if (pose.actItem === 'conch') {
+        if (st < 1.9) {
+          // 무릎 위 소라를 작은 돌로 톡톡톡
+          const up = Math.max(0, Math.sin(st * Math.PI * 2 * 2.2)) ** 0.7
+          return { lx: -0.95, lz: -0.45, rx: -1.2 - 0.55 * up, rz: 0.32 }
+        }
+        // 속살 쏙 꺼내 들어 보이기
+        tg.headTilt = -0.05
+        face.eyes = 'happy'
+        face.mouth = 'smile'
+        return { lx: -2.0, lz: -0.32, rx: -2.0, rz: 0.32 }
+      }
+      if (pose.actItem === 'abalone') {
+        if (st < 1.3) {
+          // 껍데기 밑으로 빗창을 쓱쓱
+          if (st > 1.12) face.mouth = 'o'
+          return { lx: -1.0, lz: -0.38, rx: -1.12 - 0.16 * Math.sin(st * 15), rz: 0.36 }
+        }
+        // "뽁" 떼어내서 반짝이는 껍데기를 불빛에 비춰 봄
+        tg.headTilt = -0.38
+        face.eyes = st < 1.55 ? 'round' : 'happy'
+        face.mouth = st < 1.55 ? 'o' : 'smile'
+        return { lx: -2.45, lz: -0.22, rx: -2.45, rz: 0.22 }
+      }
+      // 성게: 반으로 쩍 → 숟가락으로 알을 살살 → 한 입, 볼 빵빵 + 초승달 눈
+      if (st < 0.65) {
+        const open = smoothstep(0.5, 0.65, st)
+        return { lx: -0.92, lz: -0.42 + 0.25 * open, rx: -0.92, rz: 0.42 - 0.25 * open }
+      }
+      if (st < 1.6) return { lx: -0.95, lz: -0.4, rx: -1.05 - 0.18 * Math.sin(st * 10), rz: 0.42 }
+      const k = smoothstep(1.6, 1.8, st)
+      tg.headTilt = 0.05
+      tg.cheeks = smoothstep(1.75, 1.9, st) * (1 - smoothstep(2.3, 2.5, st))
+      face.eyes = 'happy'
+      face.mouth = st < 2.2 ? 'o' : 'smile'
+      return { lx: -0.95, lz: -0.4, rx: -1.05 - 1.3 * k, rz: 0.42 + 0.33 * k }
+    }
+    case 'tangerine': {
+      if (st < 1.5) {
+        // 껍질 까기
+        const wig = Math.sin(st * 13) * 0.09
+        tg.headTilt = 0.3
+        face.eyes = 'round'
+        return { lx: -1.35 + wig, lz: -0.52, rx: -1.35 - wig, rz: 0.52 }
+      }
+      face.eyes = 'happy'
+      face.mouth = 'smile'
+      if (st < 3.4) {
+        // 한 조각씩 냠
+        const h = hump(((st - 1.5) % 0.75) / 0.75)
+        tg.cheeks = 0.5 * h
+        return { lx: -1.2, lz: -0.45, rx: -1.2 - 1.15 * h, rz: 0.45 + 0.3 * h }
+      }
+      return { lx: -0.6, lz: -0.55, rx: -0.6, rz: 0.55 }
+    }
+    case 'doze': {
+      // 꾸벅꾸벅: 천천히 고개가 떨어지다가 가끔 퍼뜩
+      const nod = (Math.sin((t * Math.PI * 2) / 3.2) + 1) / 2
+      const jerk = t % 7.3 < 0.35 ? hump((t % 7.3) / 0.35) : 0
+      tg.headTilt = 0.22 + 0.28 * nod - 0.35 * jerk
+      tg.pitch = 0.04 + 0.05 * nod
+      tg.armX = -0.55
+      tg.armZ = -0.32
+      tg.stretch = 1 - 0.03 * nod
+      face.eyes = jerk > 0.3 ? 'round' : 'line'
+      return null
+    }
+  }
+  return null
+}
+
+function computeTarget(pose: HaenyeoPose, a: Anim, t: number): { tg: Target; face: Face; arms: Arms | null; breathe: number } {
   const st = pose.stateTime
   const lowBreath = pose.breath < CONFIG.lowBreath
   const face: Face = { eyes: 'dot', mouth: 'dot', sweat: false }
   let tg: Target = { ...BASE }
+  let arms: Arms | null = null
+  let breathe = 0
 
   switch (pose.state) {
     case 'surfaceIdle': {
@@ -149,6 +252,19 @@ function computeTarget(pose: HaenyeoPose, a: Anim, t: number): { tg: Target; fac
       }
       face.eyes = 'round'
       break
+    case 'sit': {
+      // 불턱: 다리를 앞으로 뻗고 앉아 모닥불에 손 쬐기 (살살 비빔)
+      tg = {
+        ...tg, pitch: -0.06, headTilt: 0.06, armX: -1.25 + Math.sin(t * 2.6) * 0.05, armZ: -0.18 + Math.sin(t * 5.2) * 0.04,
+        kickAmp: 0, sit: 1,
+      }
+      const g = a.gesture ? Math.min(1, a.gestureT / 1.6) : 0
+      if (a.gesture === 'tilt') tg.headRoll = 0.3 * hump(g)
+      if (a.gesture === 'look') tg.headYaw = Math.sin(g * Math.PI * 2) * 0.55 * Math.sin(Math.PI * g)
+      if (a.gesture === 'hug') face.eyes = hump(g) > 0.3 ? 'happy' : 'dot'
+      if (pose.act) arms = sitAct(pose, tg, face, t)
+      break
+    }
     case 'sumbi': {
       if (st < CONFIG.sumbiPuff) {
         // 고개를 젖히고 볼 빵빵, 입 동그랗게 "호오이~"
@@ -164,6 +280,28 @@ function computeTarget(pose: HaenyeoPose, a: Anim, t: number): { tg: Target; fac
       }
       break
     }
+  }
+
+  // 숨 고르기: 테왁을 끌어안고 눈을 감은 채 4초 들이쉬고 6초 내쉬기
+  if (pose.breatheTime >= 0 && (pose.state === 'surfaceIdle' || pose.state === 'surfaceSwim')) {
+    breathe = breatheAmount(pose.breatheTime, CONFIG.breatheIn, CONFIG.breatheOut)
+    tg.armX = -1.35
+    tg.armZ = -0.62
+    tg.headTilt = 0.05 - 0.2 * breathe
+    tg.headYaw = 0
+    tg.headRoll = 0
+    tg.cheeks = 0.3 * breathe
+    face.eyes = 'line'
+  }
+
+  // 대야가 가득 참: 다 같이 두 팔 번쩍 만세
+  if (pose.celebrateTime >= 0) {
+    const ct = pose.celebrateTime
+    const wig = Math.sin(ct * 14) * 0.15
+    arms = { lx: -0.2, lz: 2.55 + wig, rx: -0.2, rz: -2.55 + wig }
+    tg.headTilt = -0.15
+    face.eyes = 'happy'
+    face.mouth = Math.sin(ct * 5) > 0 ? 'o' : 'smile'
   }
 
   // 숨이 부족하면 볼이 살짝 부풀고 땀 한 방울
@@ -184,7 +322,17 @@ function computeTarget(pose: HaenyeoPose, a: Anim, t: number): { tg: Target; fac
     face.mouth = 'smile'
   }
 
-  return { tg, face }
+  return { tg, face, arms, breathe }
+}
+
+const handTmp = new Vector3()
+const handTmp2 = new Vector3()
+const qParent = new Quaternion()
+
+/** 어깨(shoulderX)에서 팔 회전(x, z)으로 손끝 위치 (몸 기준) */
+function handPos(shoulderX: number, rx: number, rz: number, out: Vector3) {
+  const L = 0.2
+  return out.set(shoulderX + L * Math.sin(rz), 0.05 - L * Math.cos(rz) * Math.cos(rx), -L * Math.cos(rz) * Math.sin(rx))
 }
 
 export const CHEER_DURATION = 0.75
@@ -211,6 +359,20 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
   const eyeSets = useRef<Record<Eyes, Group | null>>({ dot: null, round: null, happy: null, line: null })
   const mouths = useRef<Record<Mouth, Mesh | null>>({ dot: null, o: null, smile: null })
   const heldMeshes = useRef<Record<ItemType, Mesh | null>>({ conch: null, abalone: null, urchin: null })
+  // 불턱 소품
+  const lapItem = useRef<Group>(null!)
+  const lapMeshes = useRef<Record<ItemType, Mesh | null>>({ conch: null, abalone: null, urchin: null })
+  const stone = useRef<Mesh>(null!)
+  const knife = useRef<Mesh>(null!)
+  const spoon = useRef<Group>(null!)
+  const meat = useRef<Mesh>(null!)
+  const halfA = useRef<Group>(null!)
+  const halfB = useRef<Group>(null!)
+  const tangerine = useRef<Mesh>(null!)
+  const segment = useRef<Mesh>(null!)
+  const sparkle = useRef<Mesh>(null!)
+  const zzz = useRef<Group>(null!)
+  const zs = useRef<(Mesh | null)[]>([])
 
   const anim = useRef<Anim>({
     ...BASE,
@@ -222,9 +384,101 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
     gestureT: 0,
     nextGesture: 2 + look.phase * 3,
     nextBlink: 1 + look.phase * 3,
+    arms: { lx: -1.15, lz: -0.35, rx: -1.15, rz: 0.35 },
+    armsW: 0,
+    breathe: 0,
   })
 
-  useFrame(({ clock }, rawDt) => {
+  /** 불턱 소품: 손 위치(팔 각도)에 맞춰 보이기·움직이기 */
+  const updateProps = (pose: HaenyeoPose, t: number) => {
+    const prep = pose.state === 'sit' && pose.act === 'prep' ? pose.actItem : null
+    const tang = pose.state === 'sit' && pose.act === 'tangerine'
+    const st = pose.actTime
+    const before = st < CONFIG.prepToss
+    const lH = handPos(0.185, armL.current.rotation.x, armL.current.rotation.z, handTmp)
+    const rH = handPos(-0.185, armR.current.rotation.x, armR.current.rotation.z, handTmp2)
+
+    // 무릎 위·손에 든 해산물
+    const showLap =
+      before && ((prep === 'conch' && st < 1.9) || (prep === 'abalone') || (prep === 'urchin' && st < 0.6))
+    lapItem.current.visible = !!showLap
+    if (showLap && prep) {
+      for (const key of Object.keys(lapMeshes.current) as ItemType[]) {
+        const m = lapMeshes.current[key]
+        if (m) m.visible = key === prep
+      }
+      if (prep === 'abalone' && st >= 1.3) {
+        // 떼어낸 껍데기를 두 손으로 들고 빙글
+        lapItem.current.position.set((lH.x + rH.x) / 2, (lH.y + rH.y) / 2 + 0.05, (lH.z + rH.z) / 2 + 0.02)
+        lapItem.current.rotation.set(-0.9, t * 2.5, 0)
+      } else if (prep === 'urchin') {
+        lapItem.current.position.set((lH.x + rH.x) / 2, (lH.y + rH.y) / 2 - 0.02, (lH.z + rH.z) / 2 + 0.03)
+        lapItem.current.rotation.set(0, 0, 0)
+      } else {
+        lapItem.current.position.set(lH.x - 0.06, lH.y - 0.03, lH.z + 0.04)
+        lapItem.current.rotation.set(prep === 'abalone' ? 0.2 : 0, 0, 0)
+      }
+    }
+
+    // 소라 두드리는 돌
+    stone.current.visible = prep === 'conch' && st < 1.9
+    if (stone.current.visible) stone.current.position.set(rH.x + 0.02, rH.y - 0.01, rH.z + 0.02)
+    // 소라 속살
+    meat.current.visible = prep === 'conch' && st >= 1.9 && before
+    if (meat.current.visible) {
+      meat.current.position.set((lH.x + rH.x) / 2, (lH.y + rH.y) / 2 + 0.04, (lH.z + rH.z) / 2 + 0.02)
+      meat.current.rotation.set(0, t * 1.5, Math.sin(t * 6) * 0.2)
+    }
+
+    // 빗창
+    knife.current.visible = prep === 'abalone' && st < 1.3
+    if (knife.current.visible) {
+      knife.current.position.set(rH.x, rH.y, rH.z)
+      knife.current.rotation.set(1.25, 0, -0.9)
+    }
+    // 반짝
+    sparkle.current.visible = prep === 'abalone' && st > 1.4 && before
+    if (sparkle.current.visible) {
+      const sp = ((st - 1.4) * 2.4) % 1
+      sparkle.current.position.set((lH.x + rH.x) / 2 + 0.07, (lH.y + rH.y) / 2 + 0.11, (lH.z + rH.z) / 2 + 0.05)
+      sparkle.current.scale.setScalar(hump(sp) * 1.3)
+      sparkle.current.rotation.set(0, t * 4, 0.4)
+    }
+
+    // 성게: 반으로 가른 두 쪽 + 숟가락
+    const halves = prep === 'urchin' && st >= 0.6 && before
+    halfA.current.visible = halves
+    halfB.current.visible = halves
+    if (halves) {
+      const apart = smoothstep(0.6, 0.75, st)
+      halfA.current.position.set(lH.x - 0.02, lH.y - 0.02, lH.z + 0.04)
+      halfA.current.rotation.set(-0.25 * apart, 0, 0.3 * apart)
+      // 다른 반쪽은 무릎 위에
+      halfB.current.position.set(-0.05, -0.17, 0.3)
+      halfB.current.rotation.set(-0.15, 0, -0.2)
+    }
+    spoon.current.visible = prep === 'urchin' && st >= 0.65 && before
+    if (spoon.current.visible) {
+      spoon.current.position.set(rH.x, rH.y, rH.z)
+      spoon.current.rotation.set(st < 1.6 ? 1.0 : 2.1, 0, st < 1.6 ? -0.6 : -1.1)
+      // 숟가락 위 성게 알은 맛보기 전까지
+      spoon.current.children[1].visible = st > 0.9 && st < 2.1
+    }
+
+    // 귤
+    tangerine.current.visible = tang && st < 3.4
+    if (tangerine.current.visible) {
+      const peeled = st >= 1.5
+      tangerine.current.material = peeled ? TOOL_MAT.tangerinePeeled : TOOL_MAT.tangerine
+      const at = peeled ? lH : handTmp.set((lH.x + rH.x) / 2, (lH.y + rH.y) / 2, (lH.z + rH.z) / 2)
+      tangerine.current.position.set(at.x - (peeled ? 0.03 : 0), at.y + 0.01, at.z + 0.04)
+      tangerine.current.scale.setScalar(peeled ? 1 - 0.55 * smoothstep(1.5, 3.4, st) : 1)
+      tangerine.current.rotation.y = peeled ? 0 : Math.sin(st * 13) * 0.4
+    }
+    segment.current.visible = tang && st > 1.6 && st < 3.4 && ((st - 1.5) % 0.75) / 0.75 < 0.5
+    if (segment.current.visible) segment.current.position.set(rH.x, rH.y + 0.02, rH.z + 0.02)
+  }
+  useFrame(({ clock, camera }, rawDt) => {
     const dt = Math.min(rawDt, 0.05)
     const t = clock.elapsedTime + look.phase * 7
     const a = anim.current
@@ -240,7 +494,7 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
     a.happyT = Math.max(0, a.happyT - dt)
 
     // 대기 몸짓 스케줄
-    if (pose.state === 'surfaceIdle') {
+    if ((pose.state === 'surfaceIdle' && pose.breatheTime < 0) || (pose.state === 'sit' && !pose.act)) {
       if (a.gesture) {
         a.gestureT += dt
         if (a.gestureT > 1.6) a.gesture = null
@@ -252,10 +506,10 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
       }
     }
 
-    const { tg, face } = computeTarget(pose, a, t)
+    const { tg, face, arms, breathe } = computeTarget(pose, a, t)
     const k = damp(8, dt)
     const lerpKeys: (keyof Target)[] = [
-      'roll', 'headTilt', 'headYaw', 'headRoll', 'armX', 'armZ', 'kickAmp', 'kickFreq', 'frog', 'stretch',
+      'roll', 'headTilt', 'headYaw', 'headRoll', 'armX', 'armZ', 'kickAmp', 'kickFreq', 'frog', 'stretch', 'sit',
     ]
     for (const key of lerpKeys) a[key] += (tg[key] - a[key]) * k
     // 입수 회전은 빠르게, 하강 → 엎드림 전환은 천천히 부드럽게
@@ -264,6 +518,16 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
     a.goggles += (tg.goggles - a.goggles) * damp(9, dt)
     a.cheeks += (tg.cheeks - a.cheeks) * damp(10, dt)
     a.kickPhase += dt * a.kickFreq * (0.6 + pose.move * 0.6)
+    a.breathe += (breathe - a.breathe) * damp(6, dt)
+    // 양팔 따로: 목표 각도로 빠르게, 끝나면 평소 자세로 부드럽게 돌아옴
+    if (arms) {
+      const ka = damp(14, dt)
+      a.arms.lx += (arms.lx - a.arms.lx) * ka
+      a.arms.lz += (arms.lz - a.arms.lz) * ka
+      a.arms.rx += (arms.rx - a.arms.rx) * ka
+      a.arms.rz += (arms.rz - a.arms.rz) * ka
+    }
+    a.armsW += ((arms ? 1 : 0) - a.armsW) * damp(arms ? 12 : 6, dt)
 
     // ── 몸 전체: 퐁 튀어오름 + 늘어남/눌림 ──
     let popY = 0
@@ -283,8 +547,18 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
         stretch *= 1 + 0.07 * hump((cheer - 0.12) / 0.34)
       }
     }
-    pop.current.position.y = popY + Math.sin(t * 2.2) * 0.012
-    const side = 1 / Math.sqrt(stretch)
+    // 만세: 콩콩 뛰기
+    if (pose.celebrateTime >= 0) {
+      const ct = pose.celebrateTime
+      const w = smoothstep(0, 0.15, ct) * (1 - smoothstep(CONFIG.celebrateDuration - 0.3, CONFIG.celebrateDuration, ct))
+      popY += 0.13 * Math.abs(Math.sin(ct * Math.PI * 2.4)) * w
+    }
+    // 전복을 "뽁" 떼어낸 순간 살짝 들썩
+    if (pose.act === 'prep' && pose.actItem === 'abalone') popY += 0.04 * hump((pose.actTime - 1.3) / 0.25)
+    pop.current.position.y = popY + (pose.state === 'sit' ? 0 : Math.sin(t * 2.2) * 0.012)
+    // 숨 고르기: 들이쉬면 몸이 동그랗게 부풀고 내쉬면 가라앉음
+    stretch *= 1 + 0.045 * a.breathe
+    const side = (1 / Math.sqrt(stretch)) * (1 + 0.07 * a.breathe)
     squash.current.scale.set(side, stretch, side)
 
     body.current.rotation.set(a.pitch, 0, a.roll)
@@ -296,6 +570,13 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
     // ── 팔 ──
     armL.current.rotation.set(a.armX, 0, a.armZ)
     armR.current.rotation.set(a.armX, 0, -a.armZ)
+    if (a.armsW > 0.001) {
+      const w = a.armsW
+      armL.current.rotation.x += (a.arms.lx - armL.current.rotation.x) * w
+      armL.current.rotation.z += (a.arms.lz - armL.current.rotation.z) * w
+      armR.current.rotation.x += (a.arms.rx - armR.current.rotation.x) * w
+      armR.current.rotation.z += (a.arms.rz - armR.current.rotation.z) * w
+    }
     if (pose.waveTime >= 0) {
       // 짧은 팔로 파닥파닥
       const w = smoothstep(0, 0.18, pose.waveTime) * (1 - smoothstep(CONFIG.waveDuration - 0.25, CONFIG.waveDuration, pose.waveTime))
@@ -322,8 +603,10 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
     const s = (Math.sin(ph) + 1) / 2
     const frogZ = (0.15 + 0.55 * s) * a.frog * a.kickAmp
     const frogX = (0.55 * s - 0.15) * a.frog * a.kickAmp
-    legL.current.rotation.set(flutter + frogX, 0, frogZ)
-    legR.current.rotation.set(-flutter + frogX, 0, -frogZ)
+    // 앉으면 다리를 앞으로 쭉 (살짝 벌려서)
+    const sitK = a.sit
+    legL.current.rotation.set((flutter + frogX) * (1 - sitK) - 1.45 * sitK, 0, frogZ + 0.14 * sitK)
+    legR.current.rotation.set((-flutter + frogX) * (1 - sitK) - 1.45 * sitK, 0, -frogZ - 0.14 * sitK)
 
     // ── 얼굴 ──
     if (t > a.nextBlink + 0.13) a.nextBlink = t + 2 + Math.random() * 3
@@ -359,7 +642,26 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
         if (m) m.visible = key === pose.heldItem
       }
     }
+
+    updateProps(pose, t)
+
+    // ── 졸 때 Z Z Z (카메라를 향해 떠오름) ──
+    const dozing = pose.state === 'sit' && pose.act === 'doze'
+    zzz.current.visible = dozing
+    if (dozing) {
+      zzz.current.parent!.getWorldQuaternion(qParent).invert()
+      zzz.current.quaternion.copy(qParent).multiply(camera.quaternion)
+      zs.current.forEach((m, i) => {
+        if (!m) return
+        const c = ((t * 0.42 + i / 3) % 1 + 1) % 1
+        m.position.set(0.05 + c * 0.16, c * 0.38, 0)
+        m.scale.setScalar((0.55 + c * 0.7) * hump(Math.min(1, c * 1.15)))
+        m.rotation.z = Math.sin(t * 2 + i) * 0.15
+      })
+    }
   })
+
+
 
   const ez = headSurfaceZ(EYE_X, EYE_Y)
   const cz = headSurfaceZ(CHEEK_X, CHEEK_Y) - 0.012
@@ -482,6 +784,39 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
               ))}
             </group>
 
+            {/* 불턱 소품: 무릎 위 해산물, 돌, 빗창, 숟가락, 속살, 성게 반쪽, 귤 */}
+            <group ref={lapItem} visible={false}>
+              {(['conch', 'abalone', 'urchin'] as ItemType[]).map((it) => (
+                <mesh
+                  key={it}
+                  ref={(m) => {
+                    lapMeshes.current[it] = m
+                  }}
+                  geometry={SEAFOOD_GEOMETRY[it]}
+                  material={SEAFOOD_MATERIAL[it]}
+                  scale={0.42}
+                />
+              ))}
+            </group>
+            <mesh ref={stone} geometry={TOOL_GEO.stone} material={TOOL_MAT.stone} visible={false} />
+            <mesh ref={knife} geometry={TOOL_GEO.knife} material={TOOL_MAT.knife} visible={false} />
+            <group ref={spoon} visible={false}>
+              <mesh geometry={TOOL_GEO.spoon} material={TOOL_MAT.spoon} />
+              <mesh geometry={TOOL_GEO.roe} material={TOOL_MAT.roe} position={[0, 0.13, 0]} scale={0.32} />
+            </group>
+            <mesh ref={meat} geometry={TOOL_GEO.meat} material={TOOL_MAT.meat} visible={false} />
+            <group ref={halfA} visible={false}>
+              <mesh geometry={TOOL_GEO.urchinHalf} material={TOOL_MAT.urchinHalf} />
+              <mesh geometry={TOOL_GEO.roe} material={TOOL_MAT.roe} position={[0, -0.012, 0]} />
+            </group>
+            <group ref={halfB} visible={false}>
+              <mesh geometry={TOOL_GEO.urchinHalf} material={TOOL_MAT.urchinHalf} />
+              <mesh geometry={TOOL_GEO.roe} material={TOOL_MAT.roe} position={[0, -0.012, 0]} />
+            </group>
+            <mesh ref={sparkle} geometry={TOOL_GEO.sparkle} material={TOOL_MAT.sparkle} visible={false} />
+            <mesh ref={tangerine} geometry={TOOL_GEO.tangerine} material={TOOL_MAT.tangerine} visible={false} />
+            <mesh ref={segment} geometry={TOOL_GEO.meat} material={TOOL_MAT.tangerinePeeled} scale={0.45} visible={false} />
+
             {/* 다리 + 둥근 오리발 */}
             {(
               [
@@ -496,6 +831,19 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
             ))}
           </group>
         </group>
+      </group>
+      {/* 졸 때 머리 위 Z Z Z */}
+      <group ref={zzz} position={[0.12, 0.88, 0]} visible={false}>
+        {[0, 1, 2].map((i) => (
+          <mesh
+            key={i}
+            ref={(m) => {
+              zs.current[i] = m
+            }}
+            geometry={TOOL_GEO.z}
+            material={TOOL_MAT.z}
+          />
+        ))}
       </group>
     </group>
   )

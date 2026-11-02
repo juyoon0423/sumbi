@@ -96,7 +96,10 @@ public class GameServer {
                 s.room.changeLook(s.player.id, look.nick(), look.look(), now);
             }
             case ClientMessage.Zone zone -> {
-                // 불턱은 4단계
+                if (s.player != null) s.room.changeZone(s.player.id, zone.to(), now);
+            }
+            case ClientMessage.Prep prep -> {
+                if (s.player != null) s.room.prep(s.player.id, prep.item(), now);
             }
         }
     }
@@ -211,7 +214,10 @@ public class GameServer {
     /** 100ms: 방마다 움직인 해녀 위치를 묶어 방송 */
     public void tick() {
         long now = clock.getAsLong();
-        for (Room room : rooms.rooms()) room.snapshot(now);
+        for (Room room : rooms.rooms()) {
+            room.snapshot(now);
+            room.tickBasin(now);
+        }
     }
 
     /** 1초: 끊긴 연결 정리, 유예 만료, 대기열, 오늘의 바다 */

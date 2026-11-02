@@ -8,6 +8,7 @@ import { nickOf } from '../haenyeo/customize'
 import { lookFromCustom } from '../haenyeo/look'
 import { Tewak } from '../haenyeo/Tewak'
 import { updateTewak } from '../haenyeo/tewakMotion'
+import { advanceActs } from '../haenyeo/acts'
 import { setState, UNDERWATER_STATES } from '../haenyeo/types'
 import { clamp, damp, lerpAngle } from '../lib/math'
 import { net } from '../net'
@@ -15,9 +16,11 @@ import { useBubbles } from '../store/bubbleStore'
 import { useCustomize } from '../store/customizeStore'
 import { useGame } from '../store/gameStore'
 import { NameTag } from '../ui/NameTag'
+import { seatPose } from '../world/bulteok/layout'
 import { terrainY } from '../world/terrain'
 import { waveHeight } from '../world/sea/waves'
 import { collect, findHarvestable, seafood } from '../world/sea/seafood/seafoodState'
+import { onActEvent } from './actEvents'
 import { attachKeyboard, consumeWave, isDiveHeld, readMove } from './input'
 import { cameraRig, fx, player } from './runtime'
 
@@ -70,6 +73,17 @@ export function LocalPlayer() {
     pose.move += (moveAmt - pose.move) * damp(6, dt)
     pose.breath = p.breath
 
+    // ── 불턱 동작·만세·숨 고르기 시간 ──
+    for (const ev of advanceActs(pose, dt)) onActEvent(ev, 1, pose.actItem, p.pos, p.yaw, true)
+
+    if (p.zone === 'bulteok') {
+      // 불턱: 자리에 앉아 있음 (이동·잠수 없음)
+      const seat = seatPose(p.seat)
+      p.pos.set(seat.x, seat.y, seat.z)
+      p.yaw = seat.yaw
+      setState(pose, 'sit')
+      p.breath = Math.min(1, p.breath + dt / CONFIG.breathRecoverTime)
+    } else {
     const s = pose.state
     const underwater = UNDERWATER_STATES.has(s)
     const floor = terrainY(p.pos.x, p.pos.z) + CONFIG.floorClearance
@@ -218,6 +232,7 @@ export function LocalPlayer() {
       default:
         p.pos.y += (surf - p.pos.y) * damp(10, dt)
     }
+    }
 
     // ── 꾸미기 반응 (콩 뛰며 기뻐하기) ──
     if (pose.cheerTime >= 0) pose.cheerTime = pose.cheerTime > CHEER_DURATION ? -1 : pose.cheerTime + dt
@@ -250,8 +265,8 @@ export function LocalPlayer() {
       }
     }
 
-    // ── 테왁 ──
-    updateTewakLocal(t, dt)
+    // ── 테왁 (불턱에서는 옆에 내려놓음) ──
+    if (p.zone === 'sea') updateTewakLocal(t, dt)
 
     // ── 모델 반영 ──
     if (root.current) {
@@ -260,7 +275,7 @@ export function LocalPlayer() {
     }
 
     // ── 위치 송신 (초당 최대 10회, 거의 안 움직이면 1초에 1회) ──
-    if (game.phase === 'playing' && t > timers.current.send) {
+    if (game.phase === 'playing' && p.zone === 'sea' && t > timers.current.send) {
       const moved = timers.current.sent.distanceToSquared(p.pos) > 0.0004
       if (moved || t > timers.current.send + 1) {
         net.send({ t: 'move', p: [round(p.pos.x), round(p.pos.y), round(p.pos.z)], r: round(p.yaw) })
@@ -282,6 +297,7 @@ export function LocalPlayer() {
 }
 
 const round = (n: number) => Math.round(n * 100) / 100
+
 
 function startDive(t: number) {
   const p = player

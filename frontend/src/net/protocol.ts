@@ -3,8 +3,20 @@ import type { ItemType } from '../config'
 
 export type Vec3 = [number, number, number]
 export type Zone = 'sea' | 'bulteok'
-export type ActionType = 'dive' | 'surface' | 'sumbi' | 'wave' | 'harvest'
-export type PlayerStatus = 'surface' | 'underwater' | 'sit'
+export type ActionType =
+  | 'dive'
+  | 'surface'
+  | 'sumbi'
+  | 'wave'
+  | 'harvest'
+  // 숨 고르기 (바다 수면에서)
+  | 'breathe'
+  | 'breathe_end'
+  // 불턱에서 쉬기
+  | 'tangerine'
+  | 'doze'
+  | 'wake'
+export type PlayerStatus = 'surface' | 'underwater' | 'breathe' | 'sit' | 'doze'
 export type ItemCounts = Record<ItemType, number>
 
 export interface TodayStats {
@@ -52,6 +64,7 @@ export type ClientMessage =
   | { t: 'move'; p: Vec3; r: number }
   | { t: 'act'; a: ActionType; item?: ItemType }
   | { t: 'zone'; to: Zone }
+  | { t: 'prep'; item: ItemType; how?: 'tap' }
   | { t: 'ping'; ts: number }
 
 // ── 서버 → 클라이언트 ──
@@ -70,7 +83,12 @@ export type ServerMessage =
   | { t: 'look'; id: number; nick: string; look: LookInfo }
   | { t: 'snap'; ts: number; ps: [number, number, number, number, number][] }
   | { t: 'evt'; id: number; a: ActionType; item?: ItemType; nick?: string }
-  | { t: 'zone'; id: number; zone: Zone; seat?: number; p?: Vec3 }
+  /** left: 본인에게만, 앞으로 손질할 수 있는 개수 */
+  | { t: 'zone'; id: number; zone: Zone; seat?: number; p?: Vec3; left?: ItemCounts }
+  /** 누군가 손질 시작 (본인 포함). left: 그 사람이 앞으로 손질할 수 있는 그 종류 개수 */
+  | { t: 'prep'; id: number; item: ItemType; how: 'tap'; left?: number }
+  /** 공동 대야. full 이면 다 같이 만세 → 잠시 뒤 비운 대야(round + 1) */
+  | { t: 'basin'; fill: number; capacity: number; round: number; full?: boolean }
   | ({ t: 'today' } & TodayStats)
   | { t: 'pong'; ts: number }
   | { t: 'err'; code: string; msg: string }

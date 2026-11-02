@@ -7,10 +7,11 @@ import type { NetStatus } from '../net/WsNetClient'
 export type Phase = 'entry' | 'playing'
 
 const BASKET_KEY = 'sumbi.basket'
+const PREPPED_KEY = 'sumbi.prepped'
 
-function loadBasket(): ItemCounts {
+function loadBasket(key = BASKET_KEY): ItemCounts {
   try {
-    const raw = localStorage.getItem(BASKET_KEY)
+    const raw = localStorage.getItem(key)
     if (raw) {
       const saved = JSON.parse(raw) as { date: string; items: ItemCounts }
       if (saved.date === kstDateKey()) return saved.items
@@ -31,6 +32,8 @@ interface GameState {
   /** 전체 상한 초과로 대기 중이면 앞사람 수, 아니면 null */
   queueAhead: number | null
   basket: ItemCounts
+  /** 오늘 불턱에서 손질한 개수 (망사리에서 빠지지 않고 따로 셈) */
+  prepped: ItemCounts
   today: TodayStats | null
   /** 카메라가 물속인지 (안개·소리·화면 효과 전환용) */
   cameraUnderwater: boolean
@@ -44,6 +47,7 @@ interface GameState {
   setQueueAhead: (n: number | null) => void
   setToday: (t: TodayStats) => void
   addToBasket: (item: ItemType) => void
+  addPrepped: (item: ItemType) => void
   setCameraUnderwater: (v: boolean) => void
   setDiving: (v: boolean) => void
 }
@@ -55,6 +59,7 @@ export const useGame = create<GameState>((set, get) => ({
   netStatus: 'connecting',
   queueAhead: null,
   basket: loadBasket(),
+  prepped: loadBasket(PREPPED_KEY),
   today: null,
   cameraUnderwater: false,
   diving: false,
@@ -72,6 +77,15 @@ export const useGame = create<GameState>((set, get) => ({
     set({ basket })
     try {
       localStorage.setItem(BASKET_KEY, JSON.stringify({ date: kstDateKey(), items: basket }))
+    } catch {
+      /* 무시 */
+    }
+  },
+  addPrepped: (item) => {
+    const prepped = { ...get().prepped, [item]: get().prepped[item] + 1 }
+    set({ prepped })
+    try {
+      localStorage.setItem(PREPPED_KEY, JSON.stringify({ date: kstDateKey(), items: prepped }))
     } catch {
       /* 무시 */
     }

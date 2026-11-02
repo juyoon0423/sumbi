@@ -32,7 +32,12 @@ public record SumbiProperties(
     long lookIntervalMs,
     /** 채집 최소 간격 (ms) */
     long harvestIntervalMs,
+    /** 불턱: 손질·대야 */
+    Bulteok bulteok,
     Sea sea) {
+
+    /** 손질 모션 길이(ms, 프론트와 같게), 귤 까먹기 길이, 첫 대야 크기, 가득 찬 대야 축하 시간 */
+    public record Bulteok(long prepMs, long restMs, int basinCapacity, long basinCelebrateMs) {}
 
     /** 바다 범위·이동 속도 (프론트 config.ts 의 playCenter·playRadius 와 맞춤) */
     public record Sea(double centerX, double centerZ, double radius, double minY, double maxY, double maxSpeed, double slack) {}

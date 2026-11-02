@@ -13,8 +13,20 @@ public class Player {
     public LookInfo look;
     public final double[] pos;
     public double yaw;
-    /** surface | underwater */
+    /** surface | underwater (바다에서) */
     public String status = "surface";
+    /** sea | bulteok */
+    public String zone = "sea";
+    /** 불턱 자리 번호 (바다에 있으면 -1) */
+    public int seat = -1;
+    /** 손질 중이면 끝나는 시각 (ms) */
+    public long prepUntil;
+    /** 귤 까먹기 등 쉬기 동작이 끝나는 시각 (ms) */
+    public long restUntil;
+    public boolean dozing;
+    /** 수면에서 숨 고르기 중 */
+    public boolean breathing;
+    public long lastZoneAt;
     /** 마지막 위치 갱신 시각 (ms). 0이면 아직 클라이언트가 위치를 안 보냄 */
     public long lastMoveAt;
     public long lastHarvestAt;
@@ -40,15 +52,22 @@ public class Player {
         if (s != null) s.send(message);
     }
 
-    public PlayerInfo info() {
-        return new PlayerInfo(id, nick.display(), look, "sea", round(pos), round(yaw), status);
+    public boolean inBulteok() {
+        return "bulteok".equals(zone);
     }
 
-    static double round(double v) {
+    public PlayerInfo info() {
+        if (inBulteok()) {
+            return new PlayerInfo(id, nick.display(), look, zone, null, round(yaw), seat, dozing ? "doze" : "sit");
+        }
+        return new PlayerInfo(id, nick.display(), look, zone, round(pos), round(yaw), null, breathing ? "breathe" : status);
+    }
+
+    public static double round(double v) {
         return Math.round(v * 100) / 100.0;
     }
 
-    static double[] round(double[] p) {
+    public static double[] round(double[] p) {
         return new double[] {round(p[0]), round(p[1]), round(p[2])};
     }
 

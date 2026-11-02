@@ -1,9 +1,11 @@
 import { Vector3 } from 'three'
 import { create } from 'zustand'
 import { CONFIG, type ItemType } from '../config'
+import { startAct } from '../haenyeo/acts'
 import { createPose, setState, type HaenyeoPose } from '../haenyeo/types'
 import { fx } from '../player/runtime'
-import type { LookInfo, PlayerInfo } from './protocol'
+import { restingTewak } from '../world/bulteok/layout'
+import type { LookInfo, PlayerInfo, Vec3, Zone } from './protocol'
 
 // 다른 해녀들. 렌더링할 목록(누가 있는지, 닉네임·꾸미기)은 zustand,
 // 매 프레임 바뀌는 위치·포즈는 아래 remotes 맵에 둔다 (리렌더 없음).
@@ -28,7 +30,10 @@ export interface RemoteRuntime {
   vel: Vector3
   pose: HaenyeoPose
   underwater: boolean
-  tewak: { pos: Vector3; attached: boolean }
+  tewak: { pos: Vector3; attached: boolean; rest: boolean }
+  zone: Zone
+  /** 불턱 자리 (바다면 -1) */
+  seat: number
 }
 
 export const remotes = new Map<number, RemoteRuntime>()
@@ -52,8 +57,9 @@ function makeRuntime(p: PlayerInfo): RemoteRuntime {
   const pose = createPose()
   const underwater = p.st === 'underwater'
   if (underwater) setState(pose, 'underIdle')
+  if (p.st === 'breathe') pose.breatheTime = 0
   const yaw = p.r ?? 0
-  return {
+  const rm: RemoteRuntime = {
     id: p.id,
     samples: [{ t: serverNow(), x, y, z, r: yaw }],
     pos: new Vector3(x, y, z),
@@ -61,8 +67,54 @@ function makeRuntime(p: PlayerInfo): RemoteRuntime {
     vel: new Vector3(),
     pose,
     underwater,
-    tewak: { pos: new Vector3(x + Math.sin(yaw) * 0.47, 0, z + Math.cos(yaw) * 0.47), attached: !underwater },
+    tewak: { pos: new Vector3(x + Math.sin(yaw) * 0.47, 0, z + Math.cos(yaw) * 0.47), attached: !underwater, rest: false },
+    zone: 'sea',
+    seat: -1,
   }
+  if (p.zone === 'bulteok') {
+    setRemoteZone(rm, 'bulteok', p.seat ?? 0)
+    if (p.st === 'doze') startAct(pose, 'doze')
+  }
+  return rm
+}
+
+/** 구역 이동 (불턱 자리에 앉기 / 바다로 돌아오기) */
+function setRemoteZone(rm: RemoteRuntime, zone: Zone, seat?: number, p?: Vec3) {
+  rm.zone = zone
+  const pose = rm.pose
+  pose.act = null
+  pose.breatheTime = -1
+  if (zone === 'bulteok') {
+    rm.seat = seat ?? 0
+    rm.underwater = false
+    setState(pose, 'sit')
+    const tw = restingTewak(rm.seat)
+    rm.tewak.pos.set(tw.x, tw.y, tw.z)
+    rm.tewak.attached = false
+    rm.tewak.rest = true
+  } else {
+    rm.seat = -1
+    setState(pose, 'surfaceIdle')
+    rm.tewak.rest = false
+    rm.tewak.attached = true
+    if (p) {
+      rm.pos.set(p[0], p[1], p[2])
+      rm.samples = [{ t: serverNow(), x: p[0], y: p[1], z: p[2], r: 0 }]
+      rm.yaw = 0
+      rm.tewak.pos.set(p[0], 0, p[2] + 0.47)
+    }
+  }
+}
+
+export function applyZone(id: number, zone: Zone, seat?: number, p?: Vec3) {
+  const rm = remotes.get(id)
+  if (rm) setRemoteZone(rm, zone, seat, p)
+}
+
+/** 누군가 손질 시작 */
+export function applyPrep(id: number, item: ItemType) {
+  const rm = remotes.get(id)
+  if (rm && rm.zone === 'bulteok') startAct(rm.pose, 'prep', item)
 }
 
 const info = (p: PlayerInfo): RemoteInfo => ({ id: p.id, nick: p.nick, look: p.look })
@@ -151,6 +203,7 @@ export function applyEvent(id: number, a: string, item?: ItemType) {
   const pose = rm.pose
   switch (a) {
     case 'dive':
+      pose.breatheTime = -1
       rm.underwater = true
       rm.tewak.attached = false // 테왁은 수면에 남김
       setState(pose, 'entering')
@@ -173,6 +226,21 @@ export function applyEvent(id: number, a: string, item?: ItemType) {
     case 'wave':
       pose.waveTime = 0
       break
+    case 'breathe':
+      pose.breatheTime = 0
+      break
+    case 'breathe_end':
+      pose.breatheTime = -1
+      break
+    case 'tangerine':
+      startAct(pose, 'tangerine')
+      break
+    case 'doze':
+      startAct(pose, 'doze')
+      break
+    case 'wake':
+      if (pose.act === 'doze') pose.act = null
+      break
   }
 }
 
@@ -185,7 +253,14 @@ export function drivePose(rm: RemoteRuntime, dt: number) {
   const vy = rm.vel.y
   pose.move += (Math.min(1, hs / 2) - pose.move) * Math.min(1, dt * 6)
   const st = pose.stateTime
+  if (rm.zone === 'bulteok') {
+    setState(pose, 'sit')
+    return
+  }
   switch (pose.state) {
+    case 'sit':
+      setState(pose, 'surfaceIdle')
+      break
     case 'entering':
       if (st > CONFIG.enterDuration) setState(pose, 'descending')
       break

@@ -78,7 +78,9 @@ if (import.meta.env.DEV) {
     import('../world/sea/seafood/seafoodState'),
     import('../player/input'),
     import('./remotes'),
-  ]).then(([rt, sf, inp, rm]) => {
+    import('../store/bulteokStore'),
+    import('../player/zone'),
+  ]).then(([rt, sf, inp, rm, bt, zone]) => {
     ;(window as unknown as Record<string, unknown>).__sumbi = {
       player: rt.player,
       cameraRig: rt.cameraRig,
@@ -86,6 +88,9 @@ if (import.meta.env.DEV) {
       input: inp,
       remotes: rm.remotes,
       game: useGame,
+      bulteok: bt.useBulteok,
+      travel: zone.travel,
+      net,
     }
   })
 }

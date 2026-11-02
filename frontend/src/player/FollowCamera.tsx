@@ -64,6 +64,9 @@ export function FollowCamera() {
     const dt = Math.min(rawDt, 0.05)
     const t = clock.elapsedTime
     const p = player.pos
+    // 구역 이동(불턱 ↔ 바다): 보간 없이 바로 옮김 (화면이 가려진 동안)
+    const snap = cameraRig.snap
+    if (snap) target.current.set(p.x, p.y + 0.55, p.z)
     // 입수(entering) 동안은 카메라를 물 위에 두어 웅크림·물보라가 보이게 함
     const state = player.pose.state
     const under = UNDERWATER_STATES.has(state) && state !== 'entering'
@@ -72,7 +75,9 @@ export function FollowCamera() {
     target.current.z += (p.z - target.current.z) * damp(8, dt)
     // 머리를 아래로 하고 내려갈 땐 몸 중심이 낮아지고 계속 내려가므로 조금 아래를, 더 빠르게 따라감
     const headDown = state === 'descending'
-    target.current.y += (p.y + (headDown ? -0.15 : 0.55) - target.current.y) * damp(headDown ? 9 : under ? 5 : 3, dt)
+    // 불턱에 앉으면 머리 높이쯤을 봄
+    const lift = player.zone === 'bulteok' ? 0.35 : headDown ? -0.15 : 0.55
+    target.current.y += (p.y + lift - target.current.y) * damp(headDown ? 9 : under ? 5 : 3, dt)
 
     const game = useGame.getState()
     const showcase = game.phase === 'entry' || game.customizing
@@ -120,7 +125,12 @@ export function FollowCamera() {
     else d.y = Math.max(d.y, surf + 0.35)
     d.y = Math.max(d.y, terrainY(d.x, d.z) + 0.35)
 
-    camera.position.lerp(d, damp(7, dt))
+    if (snap) {
+      camera.position.copy(d)
+      cameraRig.snap = false
+    } else {
+      camera.position.lerp(d, damp(7, dt))
+    }
     camera.lookAt(target.current)
   }, -1)
 

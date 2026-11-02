@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { CONFIG, ITEM_LABEL, type ItemType } from '../config'
+import { CONFIG, ITEM_LABEL, withObjectParticle, type ItemType } from '../config'
 import { net } from '../net'
 import { lookInfo, nickParts } from '../net/hello'
 import { useCustomize } from '../store/customizeStore'
 import { CustomizeFields, CustomizeSheet, RandomAllButton } from './CustomizePanel'
+import { startAct } from '../haenyeo/acts'
 import { input } from '../player/input'
 import { player } from '../player/runtime'
+import { travel } from '../player/zone'
+import { useBubbles } from '../store/bubbleStore'
+import { useBulteok } from '../store/bulteokStore'
 import { useGame } from '../store/gameStore'
 import { useSettings, type Channel } from '../store/settingsStore'
 import { useToasts } from '../store/toastStore'
@@ -50,6 +54,7 @@ function ActionToasts() {
 /** 왼쪽 위: 내 채집 바구니 (망사리) */
 function Basket() {
   const basket = useGame((s) => s.basket)
+  const prepped = useGame((s) => s.prepped)
   const [bump, setBump] = useState(0)
   const total = basket.conch + basket.abalone + basket.urchin
   const prev = useRef(total)
@@ -65,6 +70,7 @@ function Basket() {
           <span key={it} title={ITEM_LABEL[it]}>
             <i className={`dot ${it}`} />
             {ITEM_LABEL[it]} <b>{basket[it]}</b>
+            {prepped[it] > 0 && <em className="prepped">(손질 {prepped[it]})</em>}
           </span>
         ))}
       </div>
@@ -145,11 +151,187 @@ function ActionBar() {
         <span>인사</span>
         <kbd>1</kbd>
       </button>
-      <button className="action" disabled title="4단계에서 열려요">
+      <button
+        className="action"
+        disabled={diving}
+        title={diving ? '수면에서 갈 수 있어요' : '모닥불 곁에서 쉬며 해산물을 손질해요'}
+        onClick={() => travel('bulteok')}
+      >
         <span className="icon">🔥</span>
         <span>불턱으로</span>
-        <kbd>준비 중</kbd>
+        <kbd>{diving ? '수면에서' : '쉬러 가기'}</kbd>
       </button>
+    </div>
+  )
+}
+
+/** 지금 손질할 수 있는 개수: 서버에 붙어 있으면 서버 값, 아니면 내 망사리 − 손질한 것 */
+function useLeft(): Record<ItemType, number> {
+  const basket = useGame((s) => s.basket)
+  const prepped = useGame((s) => s.prepped)
+  const online = useGame((s) => s.netStatus === 'online')
+  const serverLeft = useBulteok((s) => s.serverLeft)
+  if (online && serverLeft) return serverLeft
+  return {
+    conch: Math.max(0, basket.conch - prepped.conch),
+    abalone: Math.max(0, basket.abalone - prepped.abalone),
+    urchin: Math.max(0, basket.urchin - prepped.urchin),
+  }
+}
+
+/** 지금 손질·귤 까먹기 중이면 끝날 때까지 다시 그림 */
+function useBusy() {
+  const busyUntil = useBulteok((s) => s.busyUntil)
+  const [, force] = useState(0)
+  const busy = busyUntil > performance.now()
+  useEffect(() => {
+    if (!busy) return
+    const id = window.setTimeout(() => force((n) => n + 1), busyUntil - performance.now() + 30)
+    return () => window.clearTimeout(id)
+  }, [busy, busyUntil])
+  return busy
+}
+
+const PREP_LABEL: Record<ItemType, string> = { conch: '소라 두드리기', abalone: '전복 떼기', urchin: '성게 알 꺼내기' }
+
+export function prepItem(item: ItemType, left: number) {
+  if (useBulteok.getState().busyUntil > performance.now()) return
+  if (left <= 0) {
+    useBubbles.getState().sayself(`${withObjectParticle(ITEM_LABEL[item])} 바다에서 따 오세요`)
+    return
+  }
+  net.send({ t: 'prep', item })
+}
+
+function eatTangerine() {
+  const b = useBulteok.getState()
+  if (b.busyUntil > performance.now()) return
+  net.send({ t: 'act', a: 'tangerine' })
+  startAct(player.pose, 'tangerine')
+  b.setBusyUntil(performance.now() + CONFIG.tangerineDuration * 1000)
+  b.setDozing(false)
+  useBubbles.getState().sayself('귤을 까먹어요', CONFIG.tangerineDuration * 1000)
+}
+
+function toggleDoze() {
+  const b = useBulteok.getState()
+  if (b.dozing) {
+    net.send({ t: 'act', a: 'wake' })
+    if (player.pose.act === 'doze') player.pose.act = null
+    b.setDozing(false)
+    return
+  }
+  if (b.busyUntil > performance.now()) return
+  net.send({ t: 'act', a: 'doze' })
+  startAct(player.pose, 'doze')
+  b.setDozing(true)
+  useBubbles.getState().sayself('꾸벅꾸벅…')
+}
+
+/** 불턱 하단: 손질 패널(내가 딴 것만) + 쉬기 + 바다로 */
+function BulteokBar() {
+  const left = useLeft()
+  const busy = useBusy()
+  const dozing = useBulteok((s) => s.dozing)
+  const traveling = useBulteok((s) => s.traveling)
+  const leftRef = useRef(left)
+  useEffect(() => {
+    leftRef.current = left
+  }, [left])
+
+  // 단축키: 2 소라 · 3 전복 · 4 성게 · T 귤 · Z 졸기 (1 인사는 공통)
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.repeat || (e.target as HTMLElement | null)?.tagName === 'INPUT') return
+      const map: Record<string, ItemType> = { Digit2: 'conch', Digit3: 'abalone', Digit4: 'urchin' }
+      if (map[e.code]) prepItem(map[e.code], leftRef.current[map[e.code]])
+      if (e.code === 'KeyT') eatTangerine()
+      if (e.code === 'KeyZ') toggleDoze()
+    }
+    window.addEventListener('keydown', down)
+    return () => window.removeEventListener('keydown', down)
+  }, [])
+
+  const none = ITEMS.every((it) => left[it] === 0)
+  return (
+    <div className="bulteok-bar">
+      <div className="glass prep-panel">
+        <div className="prep-title">손질하기 {none && <span className="prep-hint">바다에서 따 오세요</span>}</div>
+        <div className="prep-items">
+          {ITEMS.map((it, i) => (
+            <button
+              key={it}
+              className={`prep ${left[it] === 0 ? 'empty' : ''}`}
+              disabled={busy}
+              title={left[it] === 0 ? '바다에서 따 오세요' : PREP_LABEL[it]}
+              onClick={() => prepItem(it, left[it])}
+            >
+              <i className={`dot big ${it}`} />
+              <span>{ITEM_LABEL[it]}</span>
+              <b>{left[it]}</b>
+              <kbd>{i + 2}</kbd>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="glass actionbar">
+        <button className="action" disabled={busy} onClick={eatTangerine}>
+          <span className="icon">🍊</span>
+          <span>귤 까먹기</span>
+          <kbd>T</kbd>
+        </button>
+        <button className={`action ${dozing ? 'active' : ''}`} disabled={busy && !dozing} onClick={toggleDoze}>
+          <span className="icon">{dozing ? '☀️' : '😴'}</span>
+          <span>{dozing ? '깨기' : '졸기'}</span>
+          <kbd>Z</kbd>
+        </button>
+        <button className="action" onClick={() => (input.waveRequested = true)}>
+          <span className="icon">👋</span>
+          <span>인사</span>
+          <kbd>1</kbd>
+        </button>
+        <button className="action" disabled={!!traveling} onClick={() => travel('sea')}>
+          <span className="icon">🌊</span>
+          <span>바다로</span>
+          <kbd>물질하러</kbd>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** 불턱 왼쪽 아래: 공동 대야가 얼마나 찼는지 */
+function BasinCard() {
+  const basin = useBulteok((s) => s.basin)
+  const k = Math.min(1, basin.fill / Math.max(1, basin.capacity))
+  return (
+    <div className={`glass basin-card ${basin.full ? 'full' : ''}`}>
+      <div className="today-head">
+        <span className="chip">공동 대야</span>
+        <span className="basin-round">{basin.round}번째 대야</span>
+      </div>
+      <div className="basin-track">
+        <div className="basin-fill" style={{ transform: `scaleX(${k})` }} />
+      </div>
+      <div className="today-body">
+        {basin.full ? (
+          <b>가득 찼어요! 다 같이 만세 🙌</b>
+        ) : (
+          <>
+            함께 손질한 해산물 <b>{basin.fill}</b> / {basin.capacity}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** 바다 ↔ 불턱 이동할 때 화면을 부드럽게 가림 */
+function ZoneFade() {
+  const traveling = useBulteok((s) => s.traveling)
+  return (
+    <div className={`zone-fade ${traveling ? 'on' : ''}`}>
+      {traveling && <span>{traveling === 'bulteok' ? '불턱으로 가는 중…' : '바다로 나가는 중…'}</span>}
     </div>
   )
 }
@@ -196,12 +378,13 @@ function VolumePanel() {
 /** 오른쪽 위: 바다 속에서 다시 꾸미기 (수면에 있을 때만) */
 function CustomizeButton() {
   const diving = useGame((s) => s.diving)
+  const inBulteok = useBulteok((s) => s.zone === 'bulteok')
   const setCustomizing = useGame((s) => s.setCustomizing)
   return (
     <button
       className="glass round"
       onClick={() => setCustomizing(true)}
-      disabled={diving}
+      disabled={diving || inBulteok}
       aria-label="해녀 꾸미기"
       title={diving ? '수면에서 꾸밀 수 있어요' : '해녀 꾸미기'}
     >
@@ -255,10 +438,12 @@ function QueueOverlay() {
 export function Hud() {
   const under = useGame((s) => s.cameraUnderwater)
   const customizing = useGame((s) => s.customizing)
+  const inBulteok = useBulteok((s) => s.zone === 'bulteok')
   if (customizing) return <div className="hud"><SeaCustomize /></div>
   return (
     <div className="hud">
       <div className={`vignette ${under ? 'on' : ''}`} />
+      <ZoneFade />
       <QueueOverlay />
       <div className="top-center">
         <NetStatusPill />
@@ -273,11 +458,18 @@ export function Hud() {
         <VolumePanel />
       </div>
       <div className="bottom-left">
+        {inBulteok && <BasinCard />}
         <TodaySea />
       </div>
       <div className="bottom-center">
-        <BreathGauge />
-        <ActionBar />
+        {inBulteok ? (
+          <BulteokBar />
+        ) : (
+          <>
+            <BreathGauge />
+            <ActionBar />
+          </>
+        )}
       </div>
     </div>
   )
