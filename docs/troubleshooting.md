@@ -248,3 +248,13 @@
 
 ### 별이 물속에서도 보일 수 있음
 - 별(Points)·구름은 `fog: false` 라 물속 안개에 묻히지 않음. 카메라가 물속이면(`cameraUnderwater`) 둘 다 끔.
+
+### `Haenyeo.tsx` 가 `player/float.ts` 를 가져오자 순환 import 로 화면이 안 뜸 (2026-11-03)
+- **원인**: `player/float.ts` → `net` → `remotes` → `haenyeo` 로 다시 이어짐. 캐릭터 모델 쪽이 플레이어 로직을 가져오면 고리가 생김.
+- **해결**: 두 쪽이 같이 쓰는 값(`FLOAT_UP` 일어나는 시간)을 `haenyeo/types.ts` 에 두고 `float.ts` 는 다시 내보내기만. 규칙: `haenyeo/` 는 `player/`·`net/` 을 가져오지 않는다.
+
+### 기능을 지운 뒤 확인할 것 (숨 고르기 삭제, 2026-11-03)
+- 프론트·백엔드·문서·캡처 스크립트에서 이름 검색: `grep -rni "breathe\|숨 고르기" frontend/src backend/src frontend/scripts` → 남은 것은 "삭제했다"는 주석·`main.tsx` 의 옛 저장값 지우기뿐이어야 함.
+- 옛 브라우저 저장값은 시작할 때 지움(`localStorage.removeItem('sumbi.breathe')`), 옛 일지 기록에 남은 필드는 그냥 무시(타입에서 빠져도 JSON 읽기는 안 깨짐).
+- 파일을 지운 뒤 Vite 가 옛 import 를 붙잡고 있으면 가져오던 파일을 저장(touch)해서 다시 읽게 함 (위 "Failed to load url" 항목).
+- 백엔드 서버를 다시 켜야 지운 메시지(`breathe`)를 거절함 — 켜 둔 서버는 옛 코드.

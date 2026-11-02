@@ -5,7 +5,7 @@
 
 ## 시작 전에 꼭
 
-1. **작업을 시작하기 전에 [docs/progress.md](docs/progress.md)를 먼저 읽는다** (현재 상태, 다음 할 일, 결정 기록).
+1. **새 세션을 시작하면 [docs/progress.md](docs/progress.md)의 "다음 할 일"부터 확인한다** (그다음 현재 상태·미완성 작업·결정 기록). 작업 전에 PLAN.md 의 해당 장도 읽는다.
 2. 문제가 생기면 [docs/troubleshooting.md](docs/troubleshooting.md)에 비슷한 사례가 있는지 본다.
 
 ## 로컬 실행
@@ -17,7 +17,8 @@ cd frontend && npm run build && npm run lint  # 타입 검사 + 빌드, oxlint
 ```
 
 - 환경변수·설정은 README "로컬 실행" 참고 (`SUMBI_*`, `VITE_WS_URL`). 서버가 없으면 프론트는 혼자 하는 바다로 자동 전환.
-- 개발용: `/dev/character` (캐릭터 랩), 브라우저 콘솔 `window.__sumbi` (플레이어·카메라·해산물·원격 해녀·게임 스토어·불턱·`setTime('night')`·`float.start()`·`gulls()`·`shootingStar()`), 시간대 고정 `?time=dawn|day|sunset|night`
+- `./dev.sh` 는 Redis 가 설치돼 있으면 함께 띄움(`.redis/`, 커밋 안 함), 없으면 메모리 집계. Ctrl+C 로 전부 종료.
+- 개발용: `/dev/character` (캐릭터 랩), 브라우저 콘솔 `window.__sumbi` (플레이어·카메라·해산물·원격 해녀·게임 스토어·불턱·`setTime('night')`·`float.start()`·`gulls()`·`shootingStar()`), 시간대 고정 `?time=dawn|day|sunset|night` 또는 `?hour=5.6`
 - 백엔드를 끄고 켤 때 `lsof -ti tcp:8080 -sTCP:LISTEN` 으로 서버 프로세스만 고를 것 (그냥 `tcp:8080` 은 연결된 브라우저까지 잡음)
 
 ## 작업 규칙
@@ -31,4 +32,6 @@ cd frontend && npm run build && npm run lint  # 타입 검사 + 빌드, oxlint
 - **단계(또는 의미 있는 작업)가 끝날 때마다**: 비밀 정보 점검(API 키·비밀번호·토큰·`.env`·키 파일) → 의미 있는 단위로 커밋 → `main`에 push.
 - **작업이 끝날 때마다 `docs/progress.md`와 `docs/troubleshooting.md`를 갱신하고, 그 변경도 같은 커밋에 포함**한다.
 - 커밋 메시지는 한국어, `feat:` / `fix:` / `docs:` 접두어.
+- `main` 은 항상 실행 가능하게: 끝나지 않은 작업은 `wip/<주제>` 브랜치에 커밋한다.
+- 하루를 마칠 때: 개발 서버·캡처 스크립트 종료, `git status` 깨끗한지, 로컬과 `origin/main` 이 같은지 확인.
 - 서버와 공유하는 값: 닉네임·꾸미기 목록은 `frontend/src/haenyeo/customize.ts` ↔ `backend/.../catalog/CustomizeCatalog.java` (`CustomizeCatalogTest` 가 같은지 확인), 메시지는 `frontend/src/net/protocol.ts` ↔ `backend/.../protocol/`. 바꾸면 PLAN.md 7장도 함께 고친다.
