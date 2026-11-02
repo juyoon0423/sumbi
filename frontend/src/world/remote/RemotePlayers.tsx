@@ -1,0 +1,51 @@
+import { useFrame } from '@react-three/fiber'
+import { useMemo, useRef } from 'react'
+import type { Group } from 'three'
+import { Haenyeo } from '../../haenyeo/Haenyeo'
+import { lookFromCustom } from '../../haenyeo/look'
+import { Tewak } from '../../haenyeo/Tewak'
+import { updateTewak } from '../../haenyeo/tewakMotion'
+import { drivePose, interpolate, remotes, useRemotes, type RemoteInfo } from '../../net/remotes'
+import { NameTag } from '../../ui/NameTag'
+
+function RemoteHaenyeo({ info }: { info: RemoteInfo }) {
+  const root = useRef<Group>(null!)
+  const rm = remotes.get(info.id)
+  const [adj, ...rest] = info.nick.split(' ')
+  const noun = rest.join(' ')
+  // info 는 닉네임·꾸미기가 바뀔 때만 새 객체
+  const look = useMemo(() => lookFromCustom({ ...info.look, adj, noun }), [info.look, adj, noun])
+
+  useFrame(({ clock }, rawDt) => {
+    if (!rm) return
+    const dt = Math.min(rawDt, 0.05)
+    interpolate(rm, dt)
+    drivePose(rm, dt)
+    updateTewak(rm.tewak, rm.pos, rm.yaw, clock.elapsedTime, dt)
+    root.current.position.copy(rm.pos)
+    root.current.rotation.y = rm.yaw
+  })
+
+  if (!rm) return null
+  return (
+    <>
+      <group ref={root} position={rm.pos.toArray()}>
+        <Haenyeo pose={rm.pose} look={look} />
+        <NameTag nick={info.nick} />
+      </group>
+      <Tewak state={rm.tewak} material={look.tewak} />
+    </>
+  )
+}
+
+/** 같은 바다의 다른 해녀들 */
+export function RemotePlayers() {
+  const list = useRemotes((s) => s.list)
+  return (
+    <>
+      {list.map((info) => (
+        <RemoteHaenyeo key={info.id} info={info} />
+      ))}
+    </>
+  )
+}

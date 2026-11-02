@@ -59,7 +59,8 @@ export type ServerMessage =
   | { t: 'queue'; ahead: number }
   | {
       t: 'welcome'
-      you: { id: number; nick: string; token: string; look: LookInfo }
+      /** p: 서버가 정해 준 시작 위치 (겹치지 않게) */
+      you: { id: number; nick: string; token: string; look: LookInfo; p?: Vec3 }
       room: { id: string; capacity: number }
       players: PlayerInfo[]
       today: TodayStats

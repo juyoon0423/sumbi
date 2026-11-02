@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber'
 import { Suspense } from 'react'
 import { FollowCamera } from '../player/FollowCamera'
 import { LocalPlayer } from '../player/LocalPlayer'
+import { RemotePlayers } from '../world/remote/RemotePlayers'
 import { useGame } from '../store/gameStore'
 import { Hud } from '../ui/Hud'
 import { SeaScene } from '../world/sea/SeaScene'
@@ -20,6 +21,7 @@ export function GameScreen() {
         <Suspense fallback={null}>
           <SeaScene />
           <LocalPlayer />
+          <RemotePlayers />
           <FollowCamera />
         </Suspense>
       </Canvas>

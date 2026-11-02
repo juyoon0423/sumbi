@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { ItemType } from '../config'
 import { kstDateKey } from '../lib/today'
 import type { ItemCounts, TodayStats } from '../net/protocol'
+import type { NetStatus } from '../net/WsNetClient'
 
 export type Phase = 'entry' | 'playing'
 
@@ -25,6 +26,10 @@ interface GameState {
   selfId: number | null
   /** 바다 속에서 꾸미기 메뉴를 연 상태 (이동·잠수 입력 막음) */
   customizing: boolean
+  /** 서버 연결 상태 (offline = 혼자 하는 바다) */
+  netStatus: NetStatus
+  /** 전체 상한 초과로 대기 중이면 앞사람 수, 아니면 null */
+  queueAhead: number | null
   basket: ItemCounts
   today: TodayStats | null
   /** 카메라가 물속인지 (안개·소리·화면 효과 전환용) */
@@ -35,6 +40,8 @@ interface GameState {
   setPhase: (p: Phase) => void
   setSelf: (id: number) => void
   setCustomizing: (v: boolean) => void
+  setNetStatus: (s: NetStatus) => void
+  setQueueAhead: (n: number | null) => void
   setToday: (t: TodayStats) => void
   addToBasket: (item: ItemType) => void
   setCameraUnderwater: (v: boolean) => void
@@ -45,6 +52,8 @@ export const useGame = create<GameState>((set, get) => ({
   phase: 'entry',
   selfId: null,
   customizing: false,
+  netStatus: 'connecting',
+  queueAhead: null,
   basket: loadBasket(),
   today: null,
   cameraUnderwater: false,
@@ -53,6 +62,10 @@ export const useGame = create<GameState>((set, get) => ({
   setPhase: (phase) => set({ phase }),
   setSelf: (selfId) => set({ selfId }),
   setCustomizing: (customizing) => set({ customizing }),
+  setNetStatus: (netStatus) => {
+    if (get().netStatus !== netStatus) set({ netStatus })
+  },
+  setQueueAhead: (queueAhead) => set({ queueAhead }),
   setToday: (today) => set({ today }),
   addToBasket: (item) => {
     const basket = { ...get().basket, [item]: get().basket[item] + 1 }

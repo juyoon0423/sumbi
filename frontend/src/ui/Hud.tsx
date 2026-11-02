@@ -26,6 +26,13 @@ function HintPill() {
   )
 }
 
+/** 상단 가운데: 서버 연결이 잠깐 끊겼을 때 */
+function NetStatusPill() {
+  const status = useGame((s) => s.netStatus)
+  if (status !== 'reconnecting') return null
+  return <div className="pill net-status">연결이 잠깐 끊겼어요 · 다시 연결하는 중…</div>
+}
+
 /** 상단 가운데: 다른 해녀들의 행동 알림 */
 function ActionToasts() {
   const toasts = useToasts((s) => s.visible)
@@ -231,6 +238,20 @@ function SeaCustomize() {
   )
 }
 
+/** 전체 상한을 넘었을 때 대기 화면 */
+function QueueOverlay() {
+  const ahead = useGame((s) => s.queueAhead)
+  if (ahead === null) return null
+  return (
+    <div className="queue-overlay">
+      <div className="glass queue-card">
+        <b>바다가 붐벼요</b>
+        <span>잠시 파도 소리를 들으며 기다려 주세요{ahead > 0 ? ` (앞에 ${ahead}명)` : ''}</span>
+      </div>
+    </div>
+  )
+}
+
 export function Hud() {
   const under = useGame((s) => s.cameraUnderwater)
   const customizing = useGame((s) => s.customizing)
@@ -238,7 +259,9 @@ export function Hud() {
   return (
     <div className="hud">
       <div className={`vignette ${under ? 'on' : ''}`} />
+      <QueueOverlay />
       <div className="top-center">
+        <NetStatusPill />
         <HintPill />
         <ActionToasts />
       </div>

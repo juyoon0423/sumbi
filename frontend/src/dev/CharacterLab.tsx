@@ -1,6 +1,6 @@
 import { Html } from '@react-three/drei'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Vector3, type Group } from 'three'
 import { CONFIG } from '../config'
 import { Haenyeo } from '../haenyeo/Haenyeo'
@@ -87,8 +87,12 @@ function LabCharacter({ slot, position }: { slot: Slot; position: [number, numbe
   const tewak = useMemo(() => ({ pos: new Vector3() }), [])
   const tewakGroup = useRef<Group>(null!)
   const start = useRef(-1)
+  // drei Html 은 자기 React 루트를 만든다. Canvas 가 처음 그려지는 중에 만들면 StrictMode 의
+  // 가짜 해제가 "렌더 중 루트 해제" 경고를 내므로, 첫 프레임이 지난 뒤에 붙인다.
+  const [labelReady, setLabelReady] = useState(false)
 
   useFrame(({ clock }) => {
+    if (!labelReady) setLabelReady(true)
     if (start.current < 0) start.current = clock.elapsedTime
     const lt = FIXED_T ?? (clock.elapsedTime - start.current) % slot.loop
     slot.drive(pose, lt)
@@ -103,9 +107,11 @@ function LabCharacter({ slot, position }: { slot: Slot; position: [number, numbe
         <group rotation={[0, slot.rotY ?? 0, 0]}>
           <Haenyeo pose={pose} look={look} />
         </group>
-        <Html position={[0, -0.7, 0]} center pointerEvents="none">
-          <div className="lab-label">{slot.label}</div>
-        </Html>
+        {labelReady && (
+          <Html position={[0, -0.7, 0]} center pointerEvents="none">
+            <div className="lab-label">{slot.label}</div>
+          </Html>
+        )}
       </group>
       <group ref={tewakGroup}>
         <Tewak state={tewak} material={look.tewak} />

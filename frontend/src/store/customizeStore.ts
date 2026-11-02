@@ -57,6 +57,8 @@ interface CustomizeState {
   randomizeAll: () => void
   /** 입장할 때 지금 모습을 저장 */
   commit: () => void
+  /** 서버가 고쳐 준 값 받아들이기 (반응 없이) */
+  adopt: (c: Customization) => void
 }
 
 const initial = load()
@@ -85,5 +87,9 @@ export const useCustomize = create<CustomizeState>((setState, get) => {
       })
     },
     commit: () => save(get().custom),
+    adopt: (custom) => {
+      setState({ custom })
+      save(custom)
+    },
   }
 })

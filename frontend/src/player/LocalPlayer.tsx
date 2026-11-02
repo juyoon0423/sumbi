@@ -7,6 +7,7 @@ import { CHEER_DURATION, Haenyeo } from '../haenyeo/Haenyeo'
 import { nickOf } from '../haenyeo/customize'
 import { lookFromCustom } from '../haenyeo/look'
 import { Tewak } from '../haenyeo/Tewak'
+import { updateTewak } from '../haenyeo/tewakMotion'
 import { setState, UNDERWATER_STATES } from '../haenyeo/types'
 import { clamp, damp, lerpAngle } from '../lib/math'
 import { net } from '../net'
@@ -250,7 +251,7 @@ export function LocalPlayer() {
     }
 
     // ── 테왁 ──
-    updateTewak(t, dt)
+    updateTewakLocal(t, dt)
 
     // ── 모델 반영 ──
     if (root.current) {
@@ -325,30 +326,6 @@ function arriveSurface(t: number) {
   }
 }
 
-const TETHER = 2.2
-
-function updateTewak(t: number, dt: number) {
-  const p = player
-  const tw = p.tewak
-  if (tw.attached) {
-    // 품에 안고 다님: 몸 앞쪽 수면 위
-    const tx = p.pos.x + Math.sin(p.yaw) * 0.47
-    const tz = p.pos.z + Math.cos(p.yaw) * 0.47
-    const k = damp(10, dt)
-    tw.pos.x += (tx - tw.pos.x) * k
-    tw.pos.z += (tz - tw.pos.z) * k
-    // 품에 안은 테왁은 얼굴을 가리지 않게 수면에 조금 잠김
-    tw.pos.y += (waveHeight(tw.pos.x, tw.pos.z, t) - 0.05 - tw.pos.y) * damp(12, dt)
-  } else {
-    // 수면에 두고 들어감. 줄에 매인 것처럼 멀어지면 천천히 끌려옴
-    const dx = p.pos.x - tw.pos.x
-    const dz = p.pos.z - tw.pos.z
-    const d = Math.hypot(dx, dz)
-    if (d > TETHER) {
-      const pull = Math.min(d - TETHER, (d - TETHER) * 1.5 * dt)
-      tw.pos.x += (dx / d) * pull
-      tw.pos.z += (dz / d) * pull
-    }
-    tw.pos.y = waveHeight(tw.pos.x, tw.pos.z, t) + 0.08
-  }
+function updateTewakLocal(t: number, dt: number) {
+  updateTewak(player.tewak, player.pos, player.yaw, t, dt)
 }
