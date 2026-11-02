@@ -1,0 +1,35 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: sumbi-backend
+  main:
+    banner-mode: off
+
+sumbi:
+  # 쉼표로 여러 개. 배포 때는 SUMBI_ALLOWED_ORIGINS 환경변수로 실제 프론트 주소를 넣는다
+  allowed-origins: ${SUMBI_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*}
+  room-capacity: ${SUMBI_ROOM_CAPACITY:50}
+  max-total: ${SUMBI_MAX_TOTAL:500}
+  tick-ms: 100
+  heartbeat-timeout-ms: ${SUMBI_HEARTBEAT_TIMEOUT_MS:30000}
+  reconnect-grace-ms: ${SUMBI_RECONNECT_GRACE_MS:20000}
+  max-messages-per-sec: 30
+  max-message-bytes: 1024
+  today-interval-ms: 5000
+  look-interval-ms: 2000
+  harvest-interval-ms: 1000
+  sea:
+    center-x: 0
+    center-z: 8
+    radius: 55
+    min-y: -40
+    max-y: 2
+    # 프론트 최고 속도(약 2.4m/s)보다 넉넉히. 이보다 빠른 이동은 잘라냄
+    max-speed: 5
+    slack: 1.0
+
+logging:
+  level:
+    com.sumbi: INFO

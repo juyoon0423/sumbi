@@ -1,0 +1,53 @@
+package com.sumbi.protocol;
+
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import java.util.List;
+import java.util.Map;
+
+/** 서버 → 클라이언트 (docs/PLAN.md 7.3) */
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "t")
+@JsonSubTypes({
+    @JsonSubTypes.Type(value = ServerMessage.Queue.class, name = "queue"),
+    @JsonSubTypes.Type(value = ServerMessage.Welcome.class, name = "welcome"),
+    @JsonSubTypes.Type(value = ServerMessage.Join.class, name = "join"),
+    @JsonSubTypes.Type(value = ServerMessage.Leave.class, name = "leave"),
+    @JsonSubTypes.Type(value = ServerMessage.LookChanged.class, name = "look"),
+    @JsonSubTypes.Type(value = ServerMessage.Snap.class, name = "snap"),
+    @JsonSubTypes.Type(value = ServerMessage.Evt.class, name = "evt"),
+    @JsonSubTypes.Type(value = ServerMessage.Today.class, name = "today"),
+    @JsonSubTypes.Type(value = ServerMessage.Pong.class, name = "pong"),
+    @JsonSubTypes.Type(value = ServerMessage.Err.class, name = "err"),
+})
+public sealed interface ServerMessage {
+
+    record Queue(int ahead) implements ServerMessage {}
+
+    /** you.p: 서버가 정해 준 시작 위치 (여럿이 겹치지 않게) */
+    record You(int id, String nick, String token, LookInfo look, double[] p) {}
+
+    record RoomInfo(String id, int capacity) {}
+
+    record Welcome(You you, RoomInfo room, List<PlayerInfo> players, TodayStats today) implements ServerMessage {}
+
+    record Join(PlayerInfo player) implements ServerMessage {}
+
+    record Leave(int id) implements ServerMessage {}
+
+    record LookChanged(int id, String nick, LookInfo look) implements ServerMessage {}
+
+    /** ps 각 항목: [id, x, y, z, yaw] */
+    record Snap(long ts, List<double[]> ps) implements ServerMessage {}
+
+    record Evt(int id, String a, String item) implements ServerMessage {}
+
+    record Today(int divers, Map<String, Integer> items) implements ServerMessage {
+        public static Today of(TodayStats s) {
+            return new Today(s.divers(), s.items());
+        }
+    }
+
+    record Pong(long ts) implements ServerMessage {}
+
+    record Err(String code, String msg) implements ServerMessage {}
+}
