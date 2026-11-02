@@ -150,3 +150,16 @@
 ### 캡처: 앉은 해녀 정면을 찍으려면 카메라 yaw 를 `player.yaw + 0` 근처로 (2026-11-03)
 - 카메라 리그 yaw 기준이 "해녀 앞" 이라 `+π` 를 주면 등 뒤에서 찍힘. 손질 손동작은 화면 아래 손질 패널에 가리지 않게 거리 3.5, pitch 0.1 정도.
 - 불턱 확인 스크립트: `node scripts/capture-bulteok.mjs <폴더>` (백엔드를 `SUMBI_BASIN_CAPACITY=6` 으로 켜면 대야가 빨리 참).
+
+## 오늘의 바다 Redis (4단계)
+
+### Redis 가 꺼져 있을 때 서버가 느려지거나 멈출까 (2026-11-03 확인)
+- **확인한 것**: 서버 실행 중 `redis-cli shutdown` → 다음 접속에서 `Redis command timed out`(500ms) 한 번 기다린 뒤 `Redis 집계 실패 → 30초 동안 메모리 집계로` 경고, 그 뒤 채집·입장은 바로 메모리로 처리. 30초 뒤 다시 Redis 를 시도.
+- **설정**: `spring.data.redis.timeout`·`connect-timeout` 500ms. 기본 Lettuce 는 명령 시간 제한이 60초라 그대로 두면 접속 처리 스레드가 오래 멈춤.
+- **통합 테스트**는 `sumbi.stats-store=memory` 로 고정 (로컬 Redis 가 켜져 있으면 테스트가 실제 집계를 올려 버리므로).
+
+### Redis 테스트가 건너뛰어짐
+- `RedisDailyStatsTest` 는 `redis-server` 실행 파일을 찾아 빈 포트에 직접 띄움 (`/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin`). 없으면 건너뜀 → `brew install redis`.
+
+### `dev.sh` 를 끄면 Redis 도 같이 꺼짐
+- `dev.sh` 가 띄운 Redis 는 Ctrl+C 때 같이 종료되고, 끌 때 `.redis/dump.rdb` 에 저장 → 다음 실행 때 그대로 불러옴. 따로 켜 둔 Redis(6379)가 있으면 그걸 쓰고 건드리지 않음.

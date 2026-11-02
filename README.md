@@ -50,6 +50,11 @@ cd frontend && npm install && npm run dev
 | `SUMBI_RECONNECT_GRACE_MS` | 20000 | 잠깐 끊겼을 때 같은 해녀로 돌아올 수 있는 시간 |
 | `SUMBI_SEND_TIME_LIMIT_MS` | 3000 | 메시지 하나 보내는 데 이보다 오래 걸리면 느린 연결로 보고 끊음 |
 | `SUMBI_SEND_BUFFER_BYTES` | 262144 | 연결 하나에 못 보내고 쌓인 메시지 상한 (넘으면 끊음) |
+| `SUMBI_REDIS_URL` | `redis://localhost:6379` | 오늘의 바다 집계용 Redis (비밀번호는 `redis://:<비밀번호>@호스트:6379`, 환경변수로만) |
+| `SUMBI_STATS_STORE` | `auto` | `auto`: Redis 에 닿으면 Redis, 아니면 메모리(30초마다 다시 시도) · `redis`: 닿지 않으면 시작 실패 · `memory` |
+| `SUMBI_BASIN_CAPACITY` | 20 | 불턱 첫 대야 크기 (이후 불턱 인원 × 4, 12~40) |
+
+**Redis** (선택): `brew install redis` 해 두면 `./dev.sh` 가 6379 에 띄워 줍니다(데이터는 `.redis/`, 이미 켜져 있으면 그대로 사용). 없으면 오늘의 바다는 서버 메모리에만 남고 서버를 다시 켜면 0부터.
 
 ### 프론트엔드
 

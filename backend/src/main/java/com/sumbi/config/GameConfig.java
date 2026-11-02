@@ -8,6 +8,8 @@ import com.sumbi.room.Room;
 import com.sumbi.room.RoomManager;
 import com.sumbi.stats.DailyStats;
 import com.sumbi.stats.InMemoryDailyStats;
+import com.sumbi.stats.RedisDailyStats;
+import com.sumbi.stats.ResilientDailyStats;
 import java.time.Clock;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -16,17 +18,38 @@ import java.util.concurrent.TimeUnit;
 import java.util.random.RandomGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class GameConfig {
     private static final Logger log = LoggerFactory.getLogger(GameConfig.class);
 
+    /**
+     * 오늘의 바다 저장소 (sumbi.stats-store).
+     * auto: Redis 에 닿으면 Redis, 아니면 메모리로 시작하고 30초마다 다시 시도 / redis: 닿지 않으면 시작 실패 / memory: 메모리만
+     */
     @Bean
-    public DailyStats dailyStats() {
-        // 4단계에서 RedisDailyStats 로 교체
-        return new InMemoryDailyStats(Clock.systemUTC());
+    public DailyStats dailyStats(@Value("${sumbi.stats-store:auto}") String store, ObjectProvider<StringRedisTemplate> redis) {
+        InMemoryDailyStats memory = new InMemoryDailyStats(Clock.systemUTC());
+        if ("memory".equals(store)) {
+            log.info("오늘의 바다: 메모리 집계");
+            return memory;
+        }
+        StringRedisTemplate template = redis.getIfAvailable();
+        if (template == null) {
+            if ("redis".equals(store)) throw new IllegalStateException("sumbi.stats-store=redis 인데 Redis 설정이 없음");
+            log.info("오늘의 바다: 메모리 집계 (Redis 설정 없음)");
+            return memory;
+        }
+        RedisDailyStats primary = new RedisDailyStats(template, Clock.systemUTC());
+        boolean up = primary.ping();
+        if (!up && "redis".equals(store)) throw new IllegalStateException("sumbi.stats-store=redis 인데 Redis 에 연결할 수 없음 (SUMBI_REDIS_URL 확인)");
+        log.info(up ? "오늘의 바다: Redis 집계" : "오늘의 바다: Redis 에 연결할 수 없어 메모리 집계로 시작 (30초마다 다시 시도)");
+        return new ResilientDailyStats(primary, memory, System::currentTimeMillis, 30_000, !up);
     }
 
     @Bean

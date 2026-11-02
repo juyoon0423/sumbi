@@ -17,7 +17,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
 /** 실제 서버를 띄우고 WebSocket 클라이언트 두 개로 입장·위치·행동·퇴장 확인 */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+// 로컬 Redis 가 켜져 있어도 테스트가 실제 집계를 건드리지 않게 메모리로
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "sumbi.stats-store=memory")
 class WebSocketIntegrationTest {
     @LocalServerPort
     int port;

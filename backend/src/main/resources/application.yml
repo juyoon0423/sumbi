@@ -6,6 +6,16 @@ spring:
     name: sumbi-backend
   main:
     banner-mode: off
+  data:
+    redis:
+      # 예: redis://localhost:6379, 비밀번호가 있으면 redis://:<비밀번호>@host:6379 (환경변수로만 넣을 것)
+      url: ${SUMBI_REDIS_URL:redis://localhost:6379}
+      # Redis 가 멈춰도 접속 처리가 오래 기다리지 않게 짧게
+      timeout: 500ms
+      connect-timeout: 500ms
+      # Redis 저장소(Spring Data Repository)는 쓰지 않음
+      repositories:
+        enabled: false
 
 sumbi:
   # 쉼표로 여러 개. 배포 때는 SUMBI_ALLOWED_ORIGINS 환경변수로 실제 프론트 주소를 넣는다
@@ -21,6 +31,8 @@ sumbi:
   send-time-limit-ms: ${SUMBI_SEND_TIME_LIMIT_MS:3000}
   send-buffer-bytes: ${SUMBI_SEND_BUFFER_BYTES:262144}
   today-interval-ms: 5000
+  # 오늘의 바다 저장소: auto(Redis 있으면 Redis, 없으면 메모리) | redis(꼭 Redis) | memory
+  stats-store: ${SUMBI_STATS_STORE:auto}
   look-interval-ms: 2000
   harvest-interval-ms: 1000
   bulteok:

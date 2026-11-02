@@ -46,6 +46,9 @@ target/
 bin/
 HELP.md
 
+# ── 로컬 Redis 데이터 (dev.sh) ──
+.redis/
+
 # ── 배포 ──
 deploy/data/
 
