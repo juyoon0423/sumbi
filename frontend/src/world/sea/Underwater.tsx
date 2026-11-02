@@ -86,13 +86,15 @@ function LightRays() {
 
   useFrame(({ clock }) => {
     material.uniforms.uTime.value = clock.elapsedTime
+    // 물 위에서는 파도 골 사이로 빛줄기 윗부분이 보이지 않도록 숨김
+    ref.current.visible = useGame.getState().cameraUnderwater
     if (placed.current) return
     // 햇빛 방향으로 기울이기
     const tilt = Math.atan2(Math.hypot(SUN_DIR.x, SUN_DIR.z), SUN_DIR.y) * 0.5
     const yaw = Math.atan2(SUN_DIR.x, SUN_DIR.z)
     const o = new Object3D()
     rays.forEach((r, i) => {
-      o.position.set(r.x, -0.1, r.z)
+      o.position.set(r.x, -0.4, r.z)
       o.rotation.set(-tilt, yaw, 0, 'YXZ')
       o.scale.set(r.w, 1, r.w)
       o.updateMatrix()
@@ -232,6 +234,13 @@ function Splashes() {
     [items],
   )
   const cursor = useRef(0)
+  // 물방울 입자
+  const DROPS = 36
+  const drops = useMemo(() => Array.from({ length: DROPS }, () => ({ pos: new Vector3(), vel: new Vector3(), life: -1 })), [])
+  const dropRefs = useRef<(Mesh | null)[]>([])
+  const dropGeo = useMemo(() => new SphereGeometry(0.035, 8, 6), [])
+  const dropMat = useMemo(() => new MeshBasicMaterial({ color: '#f2fcff', transparent: true, opacity: 0.85 }), [])
+  const dropCursor = useRef(0)
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.05)
@@ -239,7 +248,30 @@ function Splashes() {
       const it = items[cursor.current++ % POOL]
       it.pos.copy(fx.splashes.shift()!)
       it.life = 0
+      for (let k = 0; k < 12; k++) {
+        const d = drops[dropCursor.current++ % DROPS]
+        const a = Math.random() * Math.PI * 2
+        const sp = 0.6 + Math.random() * 1.2
+        d.pos.set(it.pos.x, waveHeight(it.pos.x, it.pos.z, clock.elapsedTime) + 0.05, it.pos.z)
+        d.vel.set(Math.cos(a) * sp, 1.8 + Math.random() * 1.6, Math.sin(a) * sp)
+        d.life = 0
+      }
     }
+    drops.forEach((d, i) => {
+      const m = dropRefs.current[i]
+      if (!m) return
+      if (d.life >= 0) {
+        d.life += dt
+        d.vel.y -= 9.8 * dt
+        d.pos.addScaledVector(d.vel, dt)
+        if (d.pos.y < waveHeight(d.pos.x, d.pos.z, clock.elapsedTime) - 0.05) d.life = -1
+      }
+      m.visible = d.life >= 0
+      if (m.visible) {
+        m.position.copy(d.pos)
+        m.scale.setScalar(1 - Math.min(1, d.life) * 0.5)
+      }
+    })
     items.forEach((it, i) => {
       const m = refs.current[i]
       if (!m) return
@@ -267,6 +299,17 @@ function Splashes() {
           }}
           geometry={geo}
           material={mats[i]}
+          visible={false}
+        />
+      ))}
+      {drops.map((_, i) => (
+        <mesh
+          key={`d${i}`}
+          ref={(m) => {
+            dropRefs.current[i] = m
+          }}
+          geometry={dropGeo}
+          material={dropMat}
           visible={false}
         />
       ))}

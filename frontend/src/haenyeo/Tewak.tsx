@@ -1,11 +1,19 @@
 import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
-import type { Group, Vector3 } from 'three'
+import { SphereGeometry, TorusGeometry, CylinderGeometry, type Group, type Material, type Vector3 } from 'three'
 import { waveHeight } from '../world/sea/waves'
 import { MAT } from './materials'
 
+// 공유 지오메트리 (모든 테왁이 같은 것을 씀)
+const GEO = {
+  ball: new SphereGeometry(0.24, 28, 20).scale(1, 0.78, 1),
+  band: new TorusGeometry(0.24, 0.013, 6, 32).rotateX(Math.PI / 2),
+  cap: new CylinderGeometry(0.025, 0.035, 0.05, 10),
+  net: new SphereGeometry(0.2, 10, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2).scale(1, 1.3, 1),
+}
+
 /** 주황 테왁 + 아래 망사리. 위치는 소유자(LocalPlayer, 원격 플레이어)가 계산해 넣는다 */
-export function Tewak({ state }: { state: { pos: Vector3 } }) {
+export function Tewak({ state, material }: { state: { pos: Vector3 }; material: Material }) {
   const ref = useRef<Group>(null!)
 
   useFrame(({ clock }) => {
@@ -21,19 +29,10 @@ export function Tewak({ state }: { state: { pos: Vector3 } }) {
 
   return (
     <group ref={ref}>
-      <mesh material={MAT.tewak} scale={[1, 0.78, 1]} castShadow>
-        <sphereGeometry args={[0.24, 28, 20]} />
-      </mesh>
-      <mesh material={MAT.tewakBand} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[0.24, 0.014, 6, 32]} />
-      </mesh>
-      <mesh material={MAT.tewakBand} position={[0, 0.19, 0]}>
-        <cylinderGeometry args={[0.025, 0.035, 0.05, 10]} />
-      </mesh>
-      {/* 망사리 (그물 주머니) */}
-      <mesh material={MAT.net} position={[0, -0.12, 0]} scale={[1, 1.3, 1]}>
-        <sphereGeometry args={[0.2, 10, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
-      </mesh>
+      <mesh geometry={GEO.ball} material={material} castShadow />
+      <mesh geometry={GEO.band} material={MAT.tewakBand} />
+      <mesh geometry={GEO.cap} material={MAT.tewakBand} position={[0, 0.19, 0]} />
+      <mesh geometry={GEO.net} material={MAT.net} position={[0, -0.12, 0]} />
     </group>
   )
 }

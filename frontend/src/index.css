@@ -554,3 +554,32 @@ button {
     bottom: 104px;
   }
 }
+
+/* ── 개발용 캐릭터 랩 ── */
+.lab {
+  position: fixed;
+  inset: 0;
+  background: #cfe7ee;
+}
+
+.lab-title {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--pill-bg);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.lab-label {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(24, 26, 30, 0.55);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}

@@ -1,9 +1,10 @@
 import { useFrame } from '@react-three/fiber'
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { Group, Vector3 } from 'three'
 import { audio } from '../audio/AudioEngine'
 import { CONFIG, ITEM_LABEL, withObjectParticle } from '../config'
 import { Haenyeo } from '../haenyeo/Haenyeo'
+import { lookFromNick } from '../haenyeo/look'
 import { Tewak } from '../haenyeo/Tewak'
 import { setState, UNDERWATER_STATES } from '../haenyeo/types'
 import { clamp, damp, lerpAngle } from '../lib/math'
@@ -36,6 +37,7 @@ export function LocalPlayer() {
   const timers = useRef({ send: 0, sent: new Vector3(Infinity, 0, 0), heartbeat: 0, bubbleSound: 1, bubbleFx: 0 })
   const phase = useGame((s) => s.phase)
   const nickname = useGame((s) => s.nickname)
+  const look = useMemo(() => lookFromNick(nickname), [nickname])
 
   useEffect(() => attachKeyboard(), [])
 
@@ -58,6 +60,7 @@ export function LocalPlayer() {
     const dirZ = -cy * mv.y - sy * mv.x
     const moveAmt = Math.hypot(mv.x, mv.y)
     pose.move += (moveAmt - pose.move) * damp(6, dt)
+    pose.breath = p.breath
 
     const s = pose.state
     const underwater = UNDERWATER_STATES.has(s)
@@ -93,6 +96,7 @@ export function LocalPlayer() {
         const item = findHarvestable(p.pos, CONFIG.harvestRadius)
         if (item) {
           p.harvestItemId = item.id
+          pose.heldItem = item.type
           setState(pose, 'harvesting')
         }
         break
@@ -116,7 +120,10 @@ export function LocalPlayer() {
       if (p.breath <= 0 && !p.forcedAscend) {
         p.forcedAscend = true
         p.diveLock = true
-        if (pose.state === 'harvesting') p.harvestItemId = -1
+        if (pose.state === 'harvesting') {
+          p.harvestItemId = -1
+          pose.heldItem = null
+        }
         if (pose.state !== 'ascending') setState(pose, 'ascending')
       }
       if (p.breath < CONFIG.lowBreath && t > timers.current.heartbeat) {
@@ -145,13 +152,26 @@ export function LocalPlayer() {
       }
     }
 
+    // ── 카메라 쪽으로 뒤돌아보기: 표정이 보여야 하는 순간과 한동안 가만히 있을 때 ──
+    if (moveAmt < 0.01) {
+      const st = pose.stateTime
+      const showOff =
+        pose.waveTime >= 0 ||
+        pose.state === 'sumbi' ||
+        (pose.state === 'harvesting' && st > CONFIG.harvestReach * 0.5)
+      const idleLong = (pose.state === 'surfaceIdle' || pose.state === 'underIdle') && st > 2.5
+      if (showOff || idleLong) {
+        p.yaw = lerpAngle(p.yaw, cameraRig.yaw, damp(showOff ? 5 : 1.4, dt))
+      }
+    }
+
     // ── 수직 이동 ──
     const surf = surfaceY(p.pos.x, p.pos.z, t)
     const floor = terrainY(p.pos.x, p.pos.z) + CONFIG.floorClearance
     switch (pose.state) {
       case 'entering': {
-        // 머리부터 쏙 들어감
-        const k = Math.min(1, pose.stateTime / CONFIG.enterDuration)
+        // 살짝 웅크렸다가 머리부터 쏙 들어감
+        const k = clamp((pose.stateTime - CONFIG.enterCrouch) / (CONFIG.enterDuration - CONFIG.enterCrouch), 0, 1)
         p.pos.y = Math.max(floor, surf - k * k * 1.1)
         break
       }
@@ -220,10 +240,10 @@ export function LocalPlayer() {
   return (
     <>
       <group ref={root}>
-        <Haenyeo pose={player.pose} />
+        <Haenyeo pose={player.pose} look={look} />
         {phase === 'playing' && <NameTag nick={nickname} self />}
       </group>
-      <Tewak state={player.tewak} />
+      <Tewak state={player.tewak} material={look.tewak} />
     </>
   )
 }
@@ -246,6 +266,7 @@ function finishHarvest(t: number) {
   const p = player
   const item = seafood[p.harvestItemId]
   p.harvestItemId = -1
+  p.pose.heldItem = null
   setState(p.pose, 'underIdle')
   if (!item || !item.active) return
   collect(item, t)
@@ -280,12 +301,13 @@ function updateTewak(t: number, dt: number) {
   const tw = p.tewak
   if (tw.attached) {
     // 품에 안고 다님: 몸 앞쪽 수면 위
-    const tx = p.pos.x + Math.sin(p.yaw) * 0.42
-    const tz = p.pos.z + Math.cos(p.yaw) * 0.42
+    const tx = p.pos.x + Math.sin(p.yaw) * 0.47
+    const tz = p.pos.z + Math.cos(p.yaw) * 0.47
     const k = damp(10, dt)
     tw.pos.x += (tx - tw.pos.x) * k
     tw.pos.z += (tz - tw.pos.z) * k
-    tw.pos.y += (waveHeight(tw.pos.x, tw.pos.z, t) + 0.04 - tw.pos.y) * damp(12, dt)
+    // 품에 안은 테왁은 얼굴을 가리지 않게 수면에 조금 잠김
+    tw.pos.y += (waveHeight(tw.pos.x, tw.pos.z, t) - 0.05 - tw.pos.y) * damp(12, dt)
   } else {
     // 수면에 두고 들어감. 줄에 매인 것처럼 멀어지면 천천히 끌려옴
     const dx = p.pos.x - tw.pos.x

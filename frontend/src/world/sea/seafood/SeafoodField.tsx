@@ -26,9 +26,9 @@ export function SeafoodField() {
       g.visible = it.active
       if (!it.active) continue
       let s = it.scale * easeOutBack(it.appear)
-      // 따는 중이면 손으로 쏙 들어가듯 작아짐
+      // 따는 중: 손을 뻗는 동안 작아지다가, 해녀가 들어 올리면(손에 든 모델로 넘어감) 사라짐
       if (player.harvestItemId === it.id && player.pose.state === 'harvesting') {
-        s *= 1 - Math.min(1, player.pose.stateTime / CONFIG.harvestDuration) * 0.9
+        s *= Math.max(0, 1 - player.pose.stateTime / CONFIG.harvestReach)
       }
       g.scale.setScalar(Math.max(0.001, s))
     }

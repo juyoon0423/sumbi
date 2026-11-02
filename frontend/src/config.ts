@@ -13,11 +13,15 @@ export const CONFIG = {
   ascendSpeed: 2.1,
 
   // 동작 시간(초)
-  enterDuration: 0.55,
+  enterDuration: 0.7,
+  enterCrouch: 0.22, // 입수 전 웅크리는 준비 동작
   sumbiMinDive: 3, // 이 시간 이상 잠수했다가 떠오르면 숨비소리
-  sumbiDuration: 1.7,
-  harvestDuration: 0.75,
-  waveDuration: 1.6,
+  sumbiDuration: 2.1,
+  sumbiPuff: 1.15, // 볼 빵빵 "호오이~" 구간, 이후 후련한 표정
+  harvestDuration: 1.35,
+  harvestReach: 0.3, // 손 뻗기 → 들어 보이기 시작
+  harvestShowEnd: 0.95, // 보여주기 끝 → 망사리에 넣기
+  waveDuration: 1.3,
 
   // 채집
   harvestRadius: 1.0,
@@ -30,7 +34,7 @@ export const CONFIG = {
   playRadius: 55,
 
   // 캐릭터가 수면에 떠 있을 때 몸 중심이 수면보다 얼마나 아래인지
-  surfaceSink: 0.1,
+  surfaceSink: -0.06,
   // 바닥 위로 최소 이만큼 떨어져 있음
   floorClearance: 0.5,
 

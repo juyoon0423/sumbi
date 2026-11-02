@@ -1,3 +1,5 @@
+import type { ItemType } from '../config'
+
 // 해녀 애니메이션 상태 (docs/PLAN.md 4.4 상태 다이어그램)
 export type HaenyeoState =
   | 'surfaceIdle'
@@ -26,10 +28,14 @@ export interface HaenyeoPose {
   move: number
   /** 인사 시작 후 지난 시간(초). 인사 중이 아니면 -1 */
   waveTime: number
+  /** 남은 숨 0~1 (표정용) */
+  breath: number
+  /** 채집 중 손에 든 해산물 */
+  heldItem: ItemType | null
 }
 
 export function createPose(): HaenyeoPose {
-  return { state: 'surfaceIdle', stateTime: 0, move: 0, waveTime: -1 }
+  return { state: 'surfaceIdle', stateTime: 0, move: 0, waveTime: -1, breath: 1, heldItem: null }
 }
 
 export function setState(pose: HaenyeoPose, next: HaenyeoState) {

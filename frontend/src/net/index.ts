@@ -12,7 +12,7 @@ if (import.meta.env.DEV) {
     import('../player/input'),
   ]).then(
     ([rt, sf, inp]) => {
-      ;(window as unknown as Record<string, unknown>).__sumbi = { player: rt.player, seafood: sf.seafood, input: inp }
+      ;(window as unknown as Record<string, unknown>).__sumbi = { player: rt.player, cameraRig: rt.cameraRig, seafood: sf.seafood, input: inp }
     },
   )
 }

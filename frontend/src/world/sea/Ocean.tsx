@@ -57,7 +57,7 @@ const fragmentShader = /* glsl */ `
       col = mix(water, uSky, clamp(fresnel * 0.9, 0.0, 1.0));
       vec3 r = reflect(-uSunDir, n);
       float spec = pow(max(dot(r, v), 0.0), 180.0);
-      col += uSun * spec * 1.6;
+      col += uSun * spec * 0.9;
     } else {
       // 물속에서 올려다본 수면
       vec3 nn = -n;
