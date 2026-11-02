@@ -7,6 +7,8 @@ import com.sumbi.protocol.ServerMessage;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -15,21 +17,26 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 /** /ws : 연결·메시지·종료를 GameServer 로 넘김. 크기·속도 제한과 JSON 해석은 여기서 */
 @Component
-public class SumbiWebSocketHandler extends TextWebSocketHandler {
+public class SumbiWebSocketHandler extends TextWebSocketHandler implements ClientConnection.Listener {
     private final GameServer game;
     private final MessageCodec codec;
     private final SumbiProperties props;
+    private final Executor sendExecutor;
     private final Map<String, ClientConnection> connections = new ConcurrentHashMap<>();
 
-    public SumbiWebSocketHandler(GameServer game, MessageCodec codec, SumbiProperties props) {
+    public SumbiWebSocketHandler(GameServer game, MessageCodec codec, SumbiProperties props,
+            @Qualifier("sendExecutor") Executor sendExecutor) {
         this.game = game;
         this.codec = codec;
         this.props = props;
+        this.sendExecutor = sendExecutor;
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
-        ClientConnection c = new ClientConnection(session, codec, props.maxMessagesPerSec());
+        ClientConnection c = new ClientConnection(session, codec, props.maxMessagesPerSec(),
+            new ClientConnection.Limits(props.sendTimeLimitMs(), props.sendBufferBytes()), sendExecutor,
+            System::currentTimeMillis, this);
         connections.put(session.getId(), c);
         game.connected(c);
     }
@@ -62,12 +69,22 @@ public class SumbiWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        ClientConnection c = connections.remove(session.getId());
+        ClientConnection c = connections.get(session.getId());
         if (c == null) return;
         // 1000(정상)·1001(탭 닫기·페이지 이동)은 바로 퇴장, 그 외(네트워크 끊김·heartbeat 만료)는 재접속 유예
         int code = status.getCode();
         boolean abnormal = code != CloseStatus.NORMAL.getCode() && code != CloseStatus.GOING_AWAY.getCode();
-        game.disconnected(c, abnormal);
+        dead(c, abnormal);
+    }
+
+    /** 세션 종료 또는 서버가 연결을 정리함 (느린 연결, heartbeat). 둘 중 먼저 온 쪽만 처리 */
+    @Override
+    public void dead(ClientConnection c, boolean abnormal) {
+        if (connections.remove(c.id(), c)) game.disconnected(c, abnormal);
+    }
+
+    public int connectionCount() {
+        return connections.size();
     }
 
     @Override

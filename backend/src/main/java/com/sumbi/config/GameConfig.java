@@ -8,6 +8,7 @@ import com.sumbi.room.RoomManager;
 import com.sumbi.stats.DailyStats;
 import com.sumbi.stats.InMemoryDailyStats;
 import java.time.Clock;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -37,6 +38,12 @@ public class GameConfig {
     @Bean
     public GameServer gameServer(SumbiProperties props, CustomizeCatalog catalog, RoomManager rooms, DailyStats stats) {
         return new GameServer(props, catalog, rooms, stats, System::currentTimeMillis, RandomGenerator.getDefault());
+    }
+
+    /** 연결별 전송 스레드 (가상 스레드: 느린 연결이 막혀도 다른 연결·방에 영향 없음) */
+    @Bean(destroyMethod = "shutdownNow")
+    public ExecutorService sendExecutor() {
+        return Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("sumbi-send-", 0).factory());
     }
 
     /** 위치 스냅샷(100ms)과 정리 작업(1초) */

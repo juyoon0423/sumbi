@@ -523,7 +523,7 @@ frontend/
 ### 8.1 구성
 - Spring Boot 3, Java 21, `spring-boot-starter-websocket` (STOMP 없이 `TextWebSocketHandler`)
 - JSON: Jackson, 메시지는 `record` + `sealed interface`로 타입 정의
-- 동시성: 방(Room) 메서드를 `synchronized` 로 묶음 (3단계 구현. 방마다 단일 스레드 큐보다 단순하고 50명 규모엔 충분, 필요하면 나중에 교체). 송신은 `ConcurrentWebSocketSessionDecorator`로 감싸 느린 클라이언트가 방을 막지 않게.
+- 동시성: 방(Room) 메서드를 `synchronized` 로 묶음 (3단계 구현. 방마다 단일 스레드 큐보다 단순하고 50명 규모엔 충분, 필요하면 나중에 교체). 송신은 연결마다 **보낼 줄 + 전송 가상 스레드 하나**(`ClientConnection`): 방 잠금 안에서는 줄에 넣기만 하고(순서 보장, 네트워크 대기 없음), 실제 전송은 잠금 밖 전송 스레드가. 전송 하나가 3초를 넘거나 못 보낸 양이 256KB를 넘으면 그 연결만 끊음(재접속 유예). 빈 바다는 닫고(`closeIfEmpty`) 닫힌 바다는 입장을 거절, 입장·퇴장·대기열 입장은 `GameServer` 한 잠금. 잠금 순서는 언제나 GameServer → RoomManager → Room.
 - 스케줄러: 방별 100ms 틱에 스냅샷 방송
 - 집계: 처음엔 메모리, 4단계에서 Redis (`INCR`, 키에 KST 날짜 포함, 48시간 TTL)
 

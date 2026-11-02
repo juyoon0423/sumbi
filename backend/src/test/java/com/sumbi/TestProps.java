@@ -11,7 +11,7 @@ public final class TestProps {
     }
 
     public static SumbiProperties props(int roomCapacity, int maxTotal) {
-        return new SumbiProperties(List.of("http://localhost:*"), roomCapacity, maxTotal, 100, 30_000, 20_000, 30, 1024,
+        return new SumbiProperties(List.of("http://localhost:*"), roomCapacity, maxTotal, 100, 30_000, 20_000, 30, 1024, 3_000, 256 * 1024,
             5_000, 2_000, 1_000, sea());
     }
 }

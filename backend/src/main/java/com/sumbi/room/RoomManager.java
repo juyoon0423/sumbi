@@ -30,8 +30,9 @@ public class RoomManager {
         return id == null ? null : rooms.get(id);
     }
 
+    /** 빈 바다 정리. 닫힌 바다는 join 이 거절하므로, 방금 배정받은 사람은 다른 바다로 다시 배정됨 */
     public synchronized void removeIfEmpty(Room room) {
-        if (room.isEmpty()) rooms.remove(room.id);
+        if (room.closeIfEmpty()) rooms.remove(room.id, room);
     }
 
     public synchronized List<Room> rooms() {

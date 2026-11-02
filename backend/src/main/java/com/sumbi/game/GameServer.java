@@ -8,6 +8,7 @@ import com.sumbi.protocol.ClientMessage;
 import com.sumbi.protocol.LookInfo;
 import com.sumbi.protocol.NickParts;
 import com.sumbi.protocol.ServerMessage;
+import com.sumbi.protocol.TodayStats;
 import com.sumbi.room.Room;
 import com.sumbi.room.RoomManager;
 import com.sumbi.stats.DailyStats;
@@ -100,7 +101,8 @@ public class GameServer {
         }
     }
 
-    public void disconnected(Client c, boolean abnormal) {
+    /** hello·대기열 입장과 같은 잠금: 같은 토큰의 재접속과 끊김 처리가 엇갈리지 않게 */
+    public synchronized void disconnected(Client c, boolean abnormal) {
         ClientState s = clients.remove(c);
         admission.remove(c);
         if (s == null || s.player == null) {
@@ -134,7 +136,8 @@ public class GameServer {
         Reservation r = reservations.get(token);
         if (r != null) {
             Room room = rooms.find(r.roomId());
-            Player back = room == null ? null : room.reattach(r.playerId(), token, c, nick, look, p -> welcome(room, p));
+            TodayStats today = stats.snapshot();
+            Player back = room == null ? null : room.reattach(r.playerId(), token, c, nick, look, p -> welcome(room, p, today));
             if (back != null) {
                 s.room = room;
                 s.player = back;
@@ -157,10 +160,12 @@ public class GameServer {
         Room room = r == null ? null : rooms.find(r.roomId());
         Integer preferredId = room != null && !room.isFull() ? r.playerId() : null;
         if (room == null || room.isFull()) room = rooms.assign();
+        // 집계는 방 잠금 밖에서 미리 (나중에 Redis 가 되어도 방을 붙잡지 않게)
+        TodayStats today = stats.snapshot();
         Player p = null;
-        for (int attempt = 0; p == null && attempt < 3; attempt++) {
+        for (int attempt = 0; p == null && attempt < 10; attempt++) {
             Room target = room;
-            p = target.join(hello.token(), hello.nick(), hello.look(), spawn(), c, preferredId, pl -> welcome(target, pl));
+            p = target.join(hello.token(), hello.nick(), hello.look(), spawn(), c, preferredId, pl -> welcome(target, pl, today));
             if (p == null) room = rooms.assign();
             else s.room = target;
         }
@@ -174,12 +179,12 @@ public class GameServer {
         log.info("joined {} #{} ({}) total={}", s.room.id, p.id, hello.nick().display(), rooms.totalPlayers());
     }
 
-    private ServerMessage welcome(Room room, Player p) {
+    private ServerMessage welcome(Room room, Player p, TodayStats today) {
         return new ServerMessage.Welcome(
             new ServerMessage.You(p.id, p.nick.display(), p.token, p.look, p.info().p()),
             new ServerMessage.RoomInfo(room.id, room.capacity),
             room.infosExcept(p.id),
-            stats.snapshot());
+            today);
     }
 
     /** 처음 위치: 테왁끼리 겹치지 않게 시작점 주변에 흩어 놓음 */
@@ -193,14 +198,11 @@ public class GameServer {
         return token != null && token.length() >= 8 && token.length() <= 64 && token.matches("[A-Za-z0-9-]+");
     }
 
-    private void admitWaiting() {
+    /** 인원 세기 → 꺼내기 → 입장을 한 잠금 안에서 (동시에 두 번 불려 상한을 넘기지 않게) */
+    private synchronized void admitWaiting() {
         for (Client c : admission.admit(rooms.totalPlayers())) {
             ClientState s = clients.get(c);
-            if (s != null && s.pendingHello != null) {
-                synchronized (this) {
-                    enter(c, s, s.pendingHello);
-                }
-            }
+            if (s != null && s.pendingHello != null) enter(c, s, s.pendingHello);
         }
     }
 

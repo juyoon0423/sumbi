@@ -22,6 +22,10 @@ public record SumbiProperties(
     int maxMessagesPerSec,
     /** 메시지 크기 상한 (bytes) */
     int maxMessageBytes,
+    /** 한 메시지 전송이 이보다 오래 걸리면 느린 연결로 보고 정리 (ms) */
+    long sendTimeLimitMs,
+    /** 연결 하나에 보내지 못하고 쌓인 메시지 상한 (bytes). 넘으면 정리 */
+    int sendBufferBytes,
     /** 오늘의 바다 방송 최소 간격 (ms) */
     long todayIntervalMs,
     /** 꾸미기 변경 최소 간격 (ms) */

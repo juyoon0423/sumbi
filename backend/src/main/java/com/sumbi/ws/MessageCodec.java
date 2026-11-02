@@ -29,6 +29,21 @@ public class MessageCodec {
         return reader.readValue(json);
     }
 
+    /** 방송 루프는 같은 메시지를 여러 명에게 보내므로, 스레드마다 직전 결과를 재사용 */
+    private final ThreadLocal<Object[]> last = new ThreadLocal<>();
+
+    public byte[] encodeBytes(ServerMessage message) {
+        Object[] l = last.get();
+        if (l != null && l[0] == message) return (byte[]) l[1];
+        try {
+            byte[] bytes = writer.writeValueAsBytes(message);
+            last.set(new Object[] {message, bytes});
+            return bytes;
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     public String encode(ServerMessage message) {
         try {
             return writer.writeValueAsString(message);

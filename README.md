@@ -48,6 +48,8 @@ cd frontend && npm install && npm run dev
 | `SUMBI_MAX_TOTAL` | 500 | 전체 동시 접속 상한 (넘으면 대기) |
 | `SUMBI_HEARTBEAT_TIMEOUT_MS` | 30000 | 이 시간 동안 메시지가 없으면 연결 정리 |
 | `SUMBI_RECONNECT_GRACE_MS` | 20000 | 잠깐 끊겼을 때 같은 해녀로 돌아올 수 있는 시간 |
+| `SUMBI_SEND_TIME_LIMIT_MS` | 3000 | 메시지 하나 보내는 데 이보다 오래 걸리면 느린 연결로 보고 끊음 |
+| `SUMBI_SEND_BUFFER_BYTES` | 262144 | 연결 하나에 못 보내고 쌓인 메시지 상한 (넘으면 끊음) |
 
 ### 프론트엔드
 

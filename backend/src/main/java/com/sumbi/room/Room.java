@@ -27,6 +27,8 @@ public class Room {
     private final long lookIntervalMs;
     private final long harvestIntervalMs;
     private final Map<Integer, Player> players = new LinkedHashMap<>();
+    /** 빈 바다로 정리됨. 이후 입장은 거절 (배정과 정리가 엇갈려 목록에 없는 바다에 들어가는 일 방지) */
+    private boolean closed;
 
     public Room(String id, int capacity, MovementValidator movement, long lookIntervalMs, long harvestIntervalMs) {
         this.id = id;
@@ -41,11 +43,21 @@ public class Room {
     }
 
     public synchronized boolean isFull() {
-        return players.size() >= capacity;
+        return closed || players.size() >= capacity;
     }
 
     public synchronized boolean isEmpty() {
         return players.isEmpty();
+    }
+
+    /** 비어 있으면 닫고 true. 닫힌 바다에는 아무도 못 들어옴 */
+    public synchronized boolean closeIfEmpty() {
+        if (players.isEmpty()) closed = true;
+        return closed;
+    }
+
+    public synchronized boolean isClosed() {
+        return closed;
     }
 
     public synchronized Player get(int id) {
@@ -61,12 +73,15 @@ public class Room {
 
     /**
      * 입장. preferredId 가 비어 있으면 그 번호(재접속), 아니면 가장 작은 빈 번호.
-     * 다른 사람들에게 join 방송. 꽉 찼으면 null.
+     * 다른 사람들에게 join 방송. 꽉 찼거나 이미 정리된 바다면 null.
+     *
+     * <p>메시지는 잠금 안에서 보내지만 send() 는 연결의 전송 줄에 넣기만 해서 네트워크를 기다리지 않는다.
+     * 잠금 안에서 줄에 넣어야 모든 해녀가 같은 순서(welcome → snap, join → leave)로 받는다.
      */
     public synchronized Player join(
             String token, NickParts nick, LookInfo look, double[] spawn, MessageSink sink, Integer preferredId,
             Function<Player, ServerMessage> welcome) {
-        if (players.size() >= capacity) return null;
+        if (closed || players.size() >= capacity) return null;
         int id = preferredId != null && preferredId > 0 && !players.containsKey(preferredId) ? preferredId : nextFreeId();
         Player p = new Player(id, token, nick, look, spawn, sink);
         players.put(id, p);

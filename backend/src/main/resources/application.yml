@@ -17,6 +17,9 @@ sumbi:
   reconnect-grace-ms: ${SUMBI_RECONNECT_GRACE_MS:20000}
   max-messages-per-sec: 30
   max-message-bytes: 1024
+  # 느린 연결 정리: 전송 하나가 이 시간보다 오래 걸리거나, 못 보낸 메시지가 이만큼 쌓이면 끊음
+  send-time-limit-ms: ${SUMBI_SEND_TIME_LIMIT_MS:3000}
+  send-buffer-bytes: ${SUMBI_SEND_BUFFER_BYTES:262144}
   today-interval-ms: 5000
   look-interval-ms: 2000
   harvest-interval-ms: 1000
