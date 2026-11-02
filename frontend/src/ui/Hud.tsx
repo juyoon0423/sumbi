@@ -5,6 +5,9 @@ import { lookInfo, nickParts } from '../net/hello'
 import { useCustomize } from '../store/customizeStore'
 import { CustomizeFields, CustomizeSheet, RandomAllButton } from './CustomizePanel'
 import { startAct } from '../haenyeo/acts'
+import { breatheAmount } from '../haenyeo/types'
+import { toggleBreathe } from '../player/breathe'
+import { useBreathe } from '../store/breatheStore'
 import { input } from '../player/input'
 import { player } from '../player/runtime'
 import { travel } from '../player/zone'
@@ -103,6 +106,7 @@ function TodaySea() {
 /** 숨 게이지: 잠수 중에만 보임. 매 프레임 값은 DOM에 직접 반영 (리렌더 없음) */
 function BreathGauge() {
   const diving = useGame((s) => s.diving)
+  const bonus = useBreathe((s) => s.bonus)
   const fill = useRef<HTMLDivElement>(null)
   const wrap = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -118,9 +122,49 @@ function BreathGauge() {
   }, [])
   return (
     <div ref={wrap} className={`breath ${diving ? '' : 'hidden'}`}>
-      <span>숨</span>
+      <span>숨{bonus > 0 && <em className="breath-bonus">+{bonus}초</em>}</span>
       <div className="breath-track">
         <div ref={fill} className="breath-fill" />
+      </div>
+    </div>
+  )
+}
+
+/** 숨 고르기 안내: 화면 가운데 둥근 빛이 4초 동안 커지고 6초 동안 작아짐 */
+function BreatheGuide() {
+  const active = useBreathe((s) => s.active)
+  const session = useBreathe((s) => s.session)
+  const bonus = useBreathe((s) => s.bonus)
+  const circle = useRef<HTMLDivElement>(null)
+  const label = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    if (!active) return
+    let raf = 0
+    let lastText = ''
+    const tick = () => {
+      const t = Math.max(0, player.pose.breatheTime)
+      const amt = breatheAmount(t, CONFIG.breatheIn, CONFIG.breatheOut)
+      if (circle.current) circle.current.style.transform = `scale(${(0.55 + 0.45 * amt).toFixed(3)})`
+      const text = t % (CONFIG.breatheIn + CONFIG.breatheOut) < CONFIG.breatheIn ? '들이쉬고…' : '내쉬고…'
+      if (label.current && text !== lastText) {
+        label.current.textContent = text
+        lastText = text
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    tick()
+    return () => cancelAnimationFrame(raf)
+  }, [active])
+  if (!active) return null
+  return (
+    <div className="breathe-guide">
+      <div ref={circle} className="breathe-circle" />
+      <div className="breathe-text">
+        <span ref={label} className="breathe-word">들이쉬고…</span>
+        <span className="breathe-sub">
+          {session > 0 ? `${session}번 숨 골랐어요` : '테왁을 안고 천천히'}
+          {bonus > 0 ? ` · 오늘 숨 +${bonus}초` : ''}
+        </span>
       </div>
     </div>
   )
@@ -129,9 +173,20 @@ function BreathGauge() {
 /** 하단 가운데: 행동 바 (레퍼런스 산사) */
 function ActionBar() {
   const diving = useGame((s) => s.diving)
+  const breathing = useBreathe((s) => s.active)
   const holdDive = (v: boolean) => () => {
     input.diveButton = v
   }
+  // B: 숨 고르기 시작/그만
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.repeat || e.code !== 'KeyB' || (e.target as HTMLElement | null)?.tagName === 'INPUT') return
+      if (useGame.getState().phase !== 'playing' || useGame.getState().customizing) return
+      toggleBreathe()
+    }
+    window.addEventListener('keydown', down)
+    return () => window.removeEventListener('keydown', down)
+  }, [])
   return (
     <div className="glass actionbar">
       <button
@@ -150,6 +205,16 @@ function ActionBar() {
         <span className="icon">👋</span>
         <span>인사</span>
         <kbd>1</kbd>
+      </button>
+      <button
+        className={`action ${breathing ? 'active' : ''}`}
+        disabled={diving}
+        title="테왁을 안고 천천히 숨을 골라요 (움직이면 멈춤)"
+        onClick={toggleBreathe}
+      >
+        <span className="icon">🫧</span>
+        <span>{breathing ? '그만 고르기' : '숨 고르기'}</span>
+        <kbd>B</kbd>
       </button>
       <button
         className="action"
@@ -445,6 +510,7 @@ export function Hud() {
       <div className={`vignette ${under ? 'on' : ''}`} />
       <ZoneFade />
       <QueueOverlay />
+      {!inBulteok && <BreatheGuide />}
       <div className="top-center">
         <NetStatusPill />
         <HintPill />

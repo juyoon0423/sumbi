@@ -12,6 +12,7 @@ import { advanceActs } from '../haenyeo/acts'
 import { setState, UNDERWATER_STATES } from '../haenyeo/types'
 import { clamp, damp, lerpAngle } from '../lib/math'
 import { net } from '../net'
+import { breathMaxSeconds } from '../store/breatheStore'
 import { useBubbles } from '../store/bubbleStore'
 import { useCustomize } from '../store/customizeStore'
 import { useGame } from '../store/gameStore'
@@ -21,6 +22,7 @@ import { terrainY } from '../world/terrain'
 import { waveHeight } from '../world/sea/waves'
 import { collect, findHarvestable, seafood } from '../world/sea/seafood/seafoodState'
 import { onActEvent } from './actEvents'
+import { tickBreathe } from './breathe'
 import { attachKeyboard, consumeWave, isDiveHeld, readMove } from './input'
 import { cameraRig, fx, player } from './runtime'
 
@@ -74,6 +76,7 @@ export function LocalPlayer() {
     pose.breath = p.breath
 
     // ── 불턱 동작·만세·숨 고르기 시간 ──
+    const prevBreathe = pose.breatheTime
     for (const ev of advanceActs(pose, dt)) onActEvent(ev, 1, pose.actItem, p.pos, p.yaw, true)
 
     if (p.zone === 'bulteok') {
@@ -84,6 +87,8 @@ export function LocalPlayer() {
       setState(pose, 'sit')
       p.breath = Math.min(1, p.breath + dt / CONFIG.breathRecoverTime)
     } else {
+    // 숨 고르기: 움직이거나 잠수하면 멈춤 (멈춘 뒤 상태 머신이 평소대로)
+    tickBreathe(pose, prevBreathe, moveAmt, diveHeld)
     const s = pose.state
     const underwater = UNDERWATER_STATES.has(s)
     const floor = terrainY(p.pos.x, p.pos.z) + CONFIG.floorClearance
@@ -148,7 +153,7 @@ export function LocalPlayer() {
 
     // ── 숨 ──
     if (underwater) {
-      p.breath = Math.max(0, p.breath - dt / CONFIG.breathMax)
+      p.breath = Math.max(0, p.breath - dt / breathMaxSeconds())
       if (p.breath <= 0 && !p.forcedAscend) {
         p.forcedAscend = true
         p.diveLock = true

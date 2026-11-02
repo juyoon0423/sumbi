@@ -5,6 +5,7 @@ import type { Zone, Vec3 } from '../net/protocol'
 import { useBulteok } from '../store/bulteokStore'
 import { useGame } from '../store/gameStore'
 import { restingTewak, seatPose } from '../world/bulteok/layout'
+import { stopBreathe } from './breathe'
 import { cameraRig, player } from './runtime'
 
 // 바다 ↔ 불턱 이동: 화면을 부드럽게 가렸다가(페이드) 서버가 자리를 정해 주면 옮기고 다시 밝힘
@@ -16,6 +17,7 @@ export function travel(to: Zone) {
   const game = useGame.getState()
   if (b.traveling || b.zone === to) return
   if (to === 'bulteok' && (game.diving || player.pose.state !== 'surfaceIdle' && player.pose.state !== 'surfaceSwim')) return
+  stopBreathe()
   b.setTraveling(to)
   window.setTimeout(() => net.send({ t: 'zone', to }), FADE_MS)
   // 서버가 답하지 않으면 원래대로
