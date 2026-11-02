@@ -4,6 +4,7 @@ import { net } from '../net'
 import { lookInfo, nickParts } from '../net/hello'
 import { useCustomize } from '../store/customizeStore'
 import { CustomizeFields, CustomizeSheet, RandomAllButton } from './CustomizePanel'
+import { JournalButton, JournalOverlay } from './JournalCard'
 import { startAct } from '../haenyeo/acts'
 import { breatheAmount } from '../haenyeo/types'
 import { toggleBreathe } from '../player/breathe'
@@ -509,6 +510,7 @@ export function Hud() {
     <div className="hud">
       <div className={`vignette ${under ? 'on' : ''}`} />
       <ZoneFade />
+      <JournalOverlay />
       <QueueOverlay />
       {!inBulteok && <BreatheGuide />}
       <div className="top-center">
@@ -520,6 +522,7 @@ export function Hud() {
         <Basket />
       </div>
       <div className="top-right">
+        <JournalButton />
         <CustomizeButton />
         <VolumePanel />
       </div>

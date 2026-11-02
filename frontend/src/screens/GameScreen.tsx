@@ -1,5 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { Suspense } from 'react'
+import { JournalCamera } from '../journal/JournalCamera'
 import { FollowCamera } from '../player/FollowCamera'
 import { LocalPlayer } from '../player/LocalPlayer'
 import { RemotePlayers } from '../world/remote/RemotePlayers'
@@ -23,6 +24,7 @@ export function GameScreen() {
           <LocalPlayer />
           <RemotePlayers />
           <FollowCamera />
+          <JournalCamera />
         </Suspense>
       </Canvas>
       {phase === 'entry' ? <EntryScreen /> : <Hud />}

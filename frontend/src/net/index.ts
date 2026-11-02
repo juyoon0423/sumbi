@@ -81,7 +81,8 @@ if (import.meta.env.DEV) {
     import('../store/bulteokStore'),
     import('../player/zone'),
     import('../world/time/env'),
-  ]).then(([rt, sf, inp, rm, bt, zone, time]) => {
+    import('../store/sessionStore'),
+  ]).then(([rt, sf, inp, rm, bt, zone, time, session]) => {
     ;(window as unknown as Record<string, unknown>).__sumbi = {
       player: rt.player,
       cameraRig: rt.cameraRig,
@@ -95,6 +96,7 @@ if (import.meta.env.DEV) {
       /** 시간대 고정: setTime('night') · setTime(21.5) · setTime(null) = 실제 한국 시간 */
       setTime: time.setTimeOverride,
       env: time.env,
+      session: session.useSession,
     }
   })
 }

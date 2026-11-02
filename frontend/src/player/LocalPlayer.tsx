@@ -16,6 +16,7 @@ import { breathMaxSeconds } from '../store/breatheStore'
 import { useBubbles } from '../store/bubbleStore'
 import { useCustomize } from '../store/customizeStore'
 import { useGame } from '../store/gameStore'
+import { useSession } from '../store/sessionStore'
 import { NameTag } from '../ui/NameTag'
 import { seatPose } from '../world/bulteok/layout'
 import { terrainY } from '../world/terrain'
@@ -325,6 +326,7 @@ function finishHarvest(t: number) {
   collect(item, t)
   audio.playHarvest()
   useGame.getState().addToBasket(item.type)
+  useSession.getState().addHarvest(item.type)
   useBubbles.getState().sayself(`${withObjectParticle(ITEM_LABEL[item.type])} 땄어요`)
   net.send({ t: 'act', a: 'harvest', item: item.type })
 }
@@ -340,6 +342,7 @@ function arriveSurface(t: number) {
   if (dived >= CONFIG.sumbiMinDive) {
     setState(p.pose, 'sumbi')
     audio.playSumbi()
+    useSession.getState().addSumbi()
     useBubbles.getState().sayself('호오이~')
     net.send({ t: 'act', a: 'sumbi' })
   } else {

@@ -1030,3 +1030,93 @@ button {
   font-weight: 700;
   color: #ffe2a8;
 }
+
+/* ── 물질 일지 ── */
+.journal-btn {
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.journal-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.journal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(8, 20, 28, 0.55);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+  animation: breathe-in-fade 0.5s ease both;
+}
+.journal-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 24px;
+  max-height: calc(100dvh - 32px);
+  width: min(460px, 100%);
+}
+.journal-image {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  max-height: calc(100dvh - 190px);
+  display: grid;
+  place-items: center;
+}
+.journal-image img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+}
+.journal-loading {
+  font-size: 14px;
+  opacity: 0.8;
+}
+.journal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.journal-actions button {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.journal-actions button.primary {
+  background: #f4a259;
+  border-color: #f4a259;
+  color: #2b1a0c;
+}
+.journal-actions button.quiet {
+  background: transparent;
+  opacity: 0.85;
+}
+.journal-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.journal-note {
+  margin: 0;
+  font-size: 11px;
+  opacity: 0.7;
+}

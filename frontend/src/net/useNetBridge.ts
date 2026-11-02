@@ -10,6 +10,7 @@ import { useBulteok } from '../store/bulteokStore'
 import { bulteokFx } from '../world/bulteok/bulteokFx'
 import { useCustomize } from '../store/customizeStore'
 import { useGame } from '../store/gameStore'
+import { useSession } from '../store/sessionStore'
 import { useToasts } from '../store/toastStore'
 import { net } from '.'
 import { buildHello } from './hello'
@@ -133,6 +134,7 @@ export function useNetBridge() {
           if (msg.id === game.selfId) {
             startAct(player.pose, 'prep', msg.item)
             game.addPrepped(msg.item)
+            useSession.getState().addPrepped(msg.item)
             if (msg.left !== undefined) useBulteok.getState().setLeftOne(msg.item, msg.left)
             useBulteok.getState().setBusyUntil(performance.now() + CONFIG.prepDuration * 1000)
             useBulteok.getState().setDozing(false)
@@ -173,12 +175,18 @@ export function useNetBridge() {
       }
     })
 
-    // 입장 버튼을 누르면 그때 고른 닉네임·꾸미기로 접속
+    // 입장 버튼을 누르면 그때 고른 닉네임·꾸미기로 접속, 바다를 떠나면(입장 화면으로) 연결을 끊음
     let connected = false
     const connectIfPlaying = () => {
-      if (connected || useGame.getState().phase !== 'playing') return
-      connected = true
-      net.connect(buildHello())
+      const playing = useGame.getState().phase === 'playing'
+      if (playing && !connected) {
+        connected = true
+        net.connect(buildHello())
+      } else if (!playing && connected) {
+        connected = false
+        net.disconnect()
+        useRemotes.getState().reset([])
+      }
     }
     connectIfPlaying()
     const unsub = useGame.subscribe(connectIfPlaying)
