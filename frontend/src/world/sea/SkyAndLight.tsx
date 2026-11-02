@@ -5,6 +5,10 @@ import { audio } from '../../audio/AudioEngine'
 import { player } from '../../player/runtime'
 import { useGame } from '../../store/gameStore'
 import { env } from '../time/env'
+import { Clouds } from '../sky/Clouds'
+import { Gulls } from '../sky/Gulls'
+import { ShootingStar } from '../sky/ShootingStar'
+import { Starfield } from '../sky/Starfield'
 import { TimeOfDay } from '../time/TimeOfDay'
 import { waveHeight } from './waves'
 
@@ -70,6 +74,10 @@ export function SkyAndLight() {
   return (
     <>
       <TimeOfDay />
+      <Starfield />
+      <Clouds />
+      <Gulls />
+      <ShootingStar />
       <hemisphereLight ref={hemi} args={['#dcefff', '#c9b48f', 1.35]} />
       <ambientLight ref={ambient} intensity={0.25} color="#fff4e6" />
       <directionalLight

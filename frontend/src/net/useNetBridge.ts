@@ -9,6 +9,7 @@ import { useBubbles } from '../store/bubbleStore'
 import { useBulteok } from '../store/bulteokStore'
 import { bulteokFx } from '../world/bulteok/bulteokFx'
 import { useCustomize } from '../store/customizeStore'
+import { useFloat } from '../store/floatStore'
 import { useGame } from '../store/gameStore'
 import { useSession } from '../store/sessionStore'
 import { useToasts } from '../store/toastStore'
@@ -68,7 +69,9 @@ function playRemoteSumbi(id: number) {
   if (distance > 90) return
   // 카메라 오른쪽 = (cos yaw, -sin yaw)
   const pan = distance > 0.5 ? Math.max(-1, Math.min(1, (dx * Math.cos(cameraRig.yaw) - dz * Math.sin(cameraRig.yaw)) / distance)) : 0
-  audio.playSumbi({ distance, pan: pan * 0.8, pitch: 0.9 + ((id * 37) % 20) / 100 })
+  // 둥둥 중엔 아주 작게 멀리서
+  const far = useFloat.getState().active ? 3 : 1
+  audio.playSumbi({ distance: distance * far + (far > 1 ? 20 : 0), pan: pan * 0.8, pitch: 0.9 + ((id * 37) % 20) / 100 })
 }
 
 /** 서버(또는 오프라인 흉내) 메시지를 스토어·소리·토스트로 연결 */

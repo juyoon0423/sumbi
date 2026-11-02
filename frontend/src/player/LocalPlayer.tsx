@@ -15,6 +15,7 @@ import { net } from '../net'
 import { useBubbles } from '../store/bubbleStore'
 import { useCustomize } from '../store/customizeStore'
 import { useGame } from '../store/gameStore'
+import { useFloat } from '../store/floatStore'
 import { useSession } from '../store/sessionStore'
 import { NameTag } from '../ui/NameTag'
 import { driveSeat } from '../world/bulteok/seatMotion'
@@ -22,6 +23,7 @@ import { terrainY } from '../world/terrain'
 import { waveHeight } from '../world/sea/waves'
 import { collect, findHarvestable, seafood } from '../world/sea/seafood/seafoodState'
 import { onActEvent } from './actEvents'
+import { FLOAT_UP, floatState, stopFloat } from './float'
 import { attachKeyboard, consumeWave, isDiveHeld, readMove } from './input'
 import { cameraRig, fx, player } from './runtime'
 
@@ -44,6 +46,7 @@ export function LocalPlayer() {
   const timers = useRef({ send: 0, sent: new Vector3(Infinity, 0, 0), heartbeat: 0, bubbleSound: 1, bubbleFx: 0 })
   const phase = useGame((s) => s.phase)
   const customizing = useGame((s) => s.customizing)
+  const floating = useFloat((s) => s.active)
   const custom = useCustomize((s) => s.custom)
   const look = useMemo(() => lookFromCustom(custom), [custom])
   const nickname = nickOf(custom)
@@ -96,6 +99,20 @@ export function LocalPlayer() {
         speed = CONFIG.surfaceSpeed
         setState(pose, moveAmt > 0.1 ? 'surfaceSwim' : 'surfaceIdle')
         if (diveHeld && !p.diveLock) startDive(t)
+        break
+      }
+      case 'float': {
+        // 둥둥: 이동 키를 누르면 일어남. 잠수는 안 됨. 물결 따라 아주 느리게 떠다님
+        if (moveAmt > 0.1 || !useFloat.getState().active) {
+          stopFloat()
+          break
+        }
+        driftFloat(t, dt)
+        useSession.setState({ floatMs: useSession.getState().floatMs + dt * 1000 })
+        break
+      }
+      case 'floatUp': {
+        if (pose.stateTime > FLOAT_UP) setState(pose, 'surfaceIdle')
         break
       }
       case 'sumbi': {
@@ -242,7 +259,7 @@ export function LocalPlayer() {
       pose.waveTime += dt
       if (pose.waveTime > CONFIG.waveDuration) pose.waveTime = -1
     }
-    if (consumeWave() && playing && pose.waveTime < 0 && pose.state !== 'entering' && pose.state !== 'descending' && pose.state !== 'ascending') {
+    if (consumeWave() && playing && pose.waveTime < 0 && pose.state !== 'entering' && pose.state !== 'descending' && pose.state !== 'ascending' && pose.state !== 'float' && pose.state !== 'floatUp') {
       pose.waveTime = 0
       audio.playChime()
       useBubbles.getState().sayself('손 흔들어 인사했어요')
@@ -289,7 +306,7 @@ export function LocalPlayer() {
     <>
       <group ref={root}>
         <Haenyeo pose={player.pose} look={look} />
-        {phase === 'playing' && !customizing && <NameTag nick={nickname} self />}
+        {phase === 'playing' && !customizing && !floating && <NameTag nick={nickname} self />}
       </group>
       <Tewak state={player.tewak} material={look.tewak} />
     </>
@@ -345,5 +362,23 @@ function arriveSurface(t: number) {
 }
 
 function updateTewakLocal(t: number, dt: number) {
-  updateTewak(player.tewak, player.pos, player.yaw, t, dt)
+  updateTewak(player.tewak, player.pos, player.yaw, t, dt, player.pose.state === 'float')
 }
+
+/** 둥둥: 물결 따라 아주 느리게 떠다니고(바다 범위·얕은 곳은 피함) 몸도 천천히 돌아감 */
+function driftFloat(t: number, dt: number) {
+  const p = player
+  const a = Math.sin(t * 0.031) * 2.2 + Math.sin(t * 0.013 + 1.3) * 1.6
+  const v = 0.07 + 0.03 * Math.sin(t * 0.07)
+  const nx = p.pos.x + Math.sin(a) * v * dt
+  const nz = p.pos.z + Math.cos(a) * v * dt
+  if (canStand(nx, nz, p.pos.y, true)) {
+    p.pos.x = nx
+    p.pos.z = nz
+  }
+  floatState.yaw += Math.sin(t * 0.045) * 0.012 * dt
+  p.yaw = lerpAngle(p.yaw, floatState.yaw, damp(floatTurnRate(p.pose.stateTime), dt))
+}
+
+/** 누우면서 천천히 돌아눕고, 그 뒤엔 거의 그대로 */
+const floatTurnRate = (st: number) => (st < 3 ? 0.9 : 0.3)

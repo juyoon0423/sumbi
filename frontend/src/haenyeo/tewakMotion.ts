@@ -7,9 +7,17 @@ const TETHER = 2.2
 
 /**
  * 테왁 움직임 (내 해녀·다른 해녀 공용).
- * attached: 품에 안고 다님(몸 앞쪽 수면), 아니면 수면에 둥둥 떠서 줄에 끌려옴.
+ * attached: 품에 안고 다님(몸 앞쪽 수면), 아니면 수면에 둥둥 떠서 줄에 끌려옴. floating: 누워서 배 위에 안음.
  */
-export function updateTewak(tw: { pos: Vector3; attached: boolean }, body: Vector3, yaw: number, t: number, dt: number) {
+export function updateTewak(tw: { pos: Vector3; attached: boolean }, body: Vector3, yaw: number, t: number, dt: number, floating = false) {
+  if (floating) {
+    // 둥둥: 누운 해녀의 배 위에 안고 있음 (발 쪽으로 조금)
+    const k = damp(2.5, dt)
+    tw.pos.x += (body.x + Math.sin(yaw) * 0.46 - tw.pos.x) * k
+    tw.pos.z += (body.z + Math.cos(yaw) * 0.46 - tw.pos.z) * k
+    tw.pos.y += (body.y + 0.12 - tw.pos.y) * k
+    return
+  }
   if (tw.attached) {
     const tx = body.x + Math.sin(yaw) * 0.47
     const tz = body.z + Math.cos(yaw) * 0.47

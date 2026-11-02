@@ -45,6 +45,7 @@ export function TimeOfDay() {
           uMoonDir: { value: new Vector3() },
           uMoonVis: { value: 0 },
           uStars: { value: 0 },
+          uWarm: { value: 0 },
           uTime: { value: 0 },
         },
         vertexShader: /* glsl */ `
@@ -64,6 +65,7 @@ export function TimeOfDay() {
           uniform vec3 uMoonDir;
           uniform float uMoonVis;
           uniform float uStars;
+          uniform float uWarm;
           uniform float uTime;
           varying vec3 vDir;
 
@@ -72,11 +74,25 @@ export function TimeOfDay() {
             p *= 17.0;
             return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
           }
+          float vnoise(vec3 p) {
+            vec3 i = floor(p);
+            vec3 f = fract(p);
+            f = f * f * (3.0 - 2.0 * f);
+            return mix(
+              mix(mix(hash(i), hash(i + vec3(1, 0, 0)), f.x), mix(hash(i + vec3(0, 1, 0)), hash(i + vec3(1, 1, 0)), f.x), f.y),
+              mix(mix(hash(i + vec3(0, 0, 1)), hash(i + vec3(1, 0, 1)), f.x), mix(hash(i + vec3(0, 1, 1)), hash(i + vec3(1, 1, 1)), f.x), f.y),
+              f.z);
+          }
 
           void main() {
             vec3 d = normalize(vDir);
             float up = max(d.y, 0.0);
             vec3 col = mix(uHorizon, uTop, pow(up, 0.55));
+
+            // 노을: 주황 지평선과 남색 하늘 사이를 보랏빛 띠로 (해 쪽이 더 진하게)
+            float sunSide = 0.6 + 0.4 * max(dot(normalize(vec3(d.x, 0.0, d.z)), normalize(vec3(uSunDir.x, 0.0, uSunDir.z))), 0.0);
+            float band = exp(-pow((up - 0.2) / 0.16, 2.0));
+            col = mix(col, vec3(0.55, 0.36, 0.62), band * uWarm * 0.55 * sunSide);
 
             // 해: 둥근 원 + 둘레 빛 (지평선 근처에선 하늘 아래쪽까지 물듦)
             float sd = max(dot(d, uSunDir), 0.0);
@@ -88,13 +104,12 @@ export function TimeOfDay() {
             col += vec3(0.55, 0.62, 0.8) * pow(md, 200.0) * 0.35 * uMoonVis;
             col = mix(col, vec3(0.95, 0.96, 1.0), smoothstep(0.99955, 0.99975, md) * uMoonVis);
 
-            // 별: 방향을 격자로 나눠 드문드문, 반짝임
-            vec3 g = floor(d * 260.0);
-            float h = hash(g);
-            float star = step(0.9975, h) * (0.6 + 0.4 * sin(uTime * (1.0 + h * 3.0) + h * 40.0));
-            vec3 f = fract(d * 260.0) - 0.5;
-            star *= smoothstep(0.5, 0.1, length(f));
-            col += vec3(0.9, 0.93, 1.0) * star * uStars * smoothstep(0.02, 0.25, d.y) * (1.0 - md);
+            // 은하수: 하늘을 비스듬히 가로지르는 옅은 띠 (별 하나하나는 Starfield 가 그림)
+            float mw = dot(d, normalize(vec3(0.82, 0.3, 0.48)));
+            float n = vnoise(d * 7.0) * 0.6 + vnoise(d * 17.0) * 0.3 + vnoise(d * 41.0) * 0.1;
+            float milky = exp(-pow(mw / 0.13, 2.0)) * smoothstep(0.25, 0.85, n);
+            milky += exp(-pow(mw / 0.05, 2.0)) * 0.25;
+            col += vec3(0.62, 0.66, 0.85) * milky * 0.13 * uStars * smoothstep(0.03, 0.3, d.y) * (1.0 - md);
 
             gl_FragColor = vec4(col, 1.0);
             #include <colorspace_fragment>
@@ -139,6 +154,8 @@ export function TimeOfDay() {
     u.uMoonDir.value.copy(env.moonDir)
     u.uMoonVis.value = moonW
     u.uStars.value = env.stars
+    // 해가 지평선 언저리이고 아직 밤이 아닐 때 = 노을빛
+    u.uWarm.value = Math.max(0, 1 - Math.abs(env.sunDir.y - 0.03) / 0.2) * Math.max(0, 1 - env.night * 1.1)
     u.uTime.value = clock.elapsedTime
     sky.current.position.copy(camera.position)
   }, -1)

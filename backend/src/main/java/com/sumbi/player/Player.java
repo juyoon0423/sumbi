@@ -24,6 +24,8 @@ public class Player {
     /** 귤 까먹기 등 쉬기 동작이 끝나는 시각 (ms) */
     public long restUntil;
     public boolean dozing;
+    /** 바다 수면에 누워 하늘을 보는 중 (둥둥) */
+    public boolean floating;
     /** 자리를 옮겨 걸어가는 중이면 앉기까지 끝나는 시각 (ms). 목적지 자리는 seat 에 이미 잡혀 있음 */
     public long walkUntil;
     public long lastZoneAt;
@@ -60,7 +62,7 @@ public class Player {
         if (inBulteok()) {
             return new PlayerInfo(id, nick.display(), look, zone, null, round(yaw), seat, dozing ? "doze" : "sit");
         }
-        return new PlayerInfo(id, nick.display(), look, zone, round(pos), round(yaw), null, status);
+        return new PlayerInfo(id, nick.display(), look, zone, round(pos), round(yaw), null, floating ? "float" : status);
     }
 
     public static double round(double v) {

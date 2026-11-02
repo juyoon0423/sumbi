@@ -83,7 +83,11 @@ if (import.meta.env.DEV) {
     import('../world/time/env'),
     import('../store/sessionStore'),
     import('../world/bulteok/layout'),
-  ]).then(([rt, sf, inp, rm, bt, zone, time, session, layout]) => {
+    import('../player/float'),
+    import('../world/sky/Gulls'),
+    import('../world/sky/ShootingStar'),
+    import('../player/FollowCamera'),
+  ]).then(([rt, sf, inp, rm, bt, zone, time, session, layout, float, gulls, star, fcam]) => {
     ;(window as unknown as Record<string, unknown>).__sumbi = {
       player: rt.player,
       cameraRig: rt.cameraRig,
@@ -108,6 +112,11 @@ if (import.meta.env.DEV) {
       setTime: time.setTimeOverride,
       env: time.env,
       session: session.useSession,
+      /** 둥둥: float.start() · float.stop() · float.cam (둘러보기 각도) */
+      float: { start: float.startFloat, stop: float.stopFloat, toggle: float.toggleFloat, cam: float.floatCam, view: fcam.FLOAT_VIEW },
+      /** 하늘: 갈매기 바로 날리기 · 별똥별 바로 떨어뜨리기 */
+      gulls: () => gulls.gullControl.spawn(),
+      shootingStar: () => star.shootingStarControl.fire(),
     }
   })
 }

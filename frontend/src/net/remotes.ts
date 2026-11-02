@@ -2,7 +2,7 @@ import { Vector3 } from 'three'
 import { create } from 'zustand'
 import { CONFIG, type ItemType } from '../config'
 import { startAct } from '../haenyeo/acts'
-import { createPose, LAND_STATES, setState, type HaenyeoPose } from '../haenyeo/types'
+import { createPose, FLOAT_UP, LAND_STATES, setState, type HaenyeoPose } from '../haenyeo/types'
 import { fx } from '../player/runtime'
 import { restingTewak } from '../world/bulteok/layout'
 import { beginSeatWalk } from '../world/bulteok/seatMotion'
@@ -61,6 +61,7 @@ function makeRuntime(p: PlayerInfo): RemoteRuntime {
   const pose = createPose()
   const underwater = p.st === 'underwater'
   if (underwater) setState(pose, 'underIdle')
+  if (p.st === 'float') setState(pose, 'float')
   const yaw = p.r ?? 0
   const rm: RemoteRuntime = {
     id: p.id,
@@ -236,6 +237,15 @@ export function applyEvent(id: number, a: string, item?: ItemType) {
     case 'wave':
       pose.waveTime = 0
       break
+    case 'float':
+      // 둥둥: 테왁을 안고 누워 떠다님 (토스트 없음 — 조용한 모드)
+      pose.waveTime = -1
+      setState(pose, 'float')
+      break
+    case 'float_end':
+      if (pose.state === 'float') setState(pose, 'floatUp')
+      fx.splashes.push({ pos: rm.pos.clone(), power: 0.5 })
+      break
     case 'tangerine':
       startAct(pose, 'tangerine')
       break
@@ -286,6 +296,11 @@ export function drivePose(rm: RemoteRuntime, dt: number) {
       break
     case 'sumbi':
       if (st > CONFIG.sumbiDuration) setState(pose, 'surfaceIdle')
+      break
+    case 'float':
+      break
+    case 'floatUp':
+      if (st > FLOAT_UP) setState(pose, 'surfaceIdle')
       break
     case 'surfaceIdle':
     case 'surfaceSwim':

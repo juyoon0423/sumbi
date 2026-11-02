@@ -13,6 +13,10 @@ export interface JournalEntry {
   harvested: ItemCounts
   prepped: ItemCounts
   met: number
+  /** 둥둥으로 하늘을 본 시간 (ms, 옛 기록엔 없음) */
+  floatMs?: number
+  /** 둥둥 중 별똥별을 봄 */
+  shootingStar?: boolean
   preset: TimePreset
   nick: string
 }
@@ -131,12 +135,15 @@ export function drawCard(entry: JournalEntry, photo: HTMLCanvasElement | null, f
     ['손질한 것', total(entry.prepped) > 0 ? list(entry.prepped) : '—'],
     ['함께한 해녀', entry.met > 0 ? `${entry.met}명` : '혼자 조용히'],
   ]
+  if (entry.floatMs && entry.floatMs > 0) rows.push(['둥둥', skyLine(entry.floatMs)])
+  if (entry.shootingStar) rows.push(['밤하늘', '별똥별을 봤어요'])
   y += 34
-  const rowH = rows.length > 4 ? 66 : 76
+  const rowH = rows.length > 5 ? 58 : rows.length > 4 ? 66 : 76
+  const bh = Math.min(60, rowH - 8)
   for (const [k, v] of rows) {
     y += rowH
     g.fillStyle = t.chip
-    roundRect(g, x - 4, y - 46, W - (x - 4) * 2, 60, 18)
+    roundRect(g, x - 4, y - 46 + (60 - bh) / 2, W - (x - 4) * 2, bh, 18)
     g.fill()
     g.fillStyle = t.soft
     g.font = `600 30px ${font}`
@@ -156,6 +163,12 @@ export function drawCard(entry: JournalEntry, photo: HTMLCanvasElement | null, f
   const brand = '숨비 · 제주 해녀 바다'
   g.fillText(brand, W - x - g.measureText(brand).width, H - 58)
   return c
+}
+
+/** 둥둥 시간 → "하늘을 12분 바라봤어요" */
+export function skyLine(ms: number) {
+  const m = Math.round(ms / 60000)
+  return m < 1 ? '하늘을 잠깐 바라봤어요' : `하늘을 ${m}분 바라봤어요`
 }
 
 export function cardBlob(card: HTMLCanvasElement): Promise<Blob> {

@@ -6,11 +6,13 @@ import { useCustomize } from '../store/customizeStore'
 import { CustomizeFields, CustomizeSheet, RandomAllButton } from './CustomizePanel'
 import { JournalButton, JournalOverlay } from './JournalCard'
 import { startAct } from '../haenyeo/acts'
+import { stopFloat, toggleFloat } from '../player/float'
 import { input } from '../player/input'
 import { player } from '../player/runtime'
 import { travel } from '../player/zone'
 import { useBubbles } from '../store/bubbleStore'
 import { useBulteok } from '../store/bulteokStore'
+import { useFloat } from '../store/floatStore'
 import { useGame } from '../store/gameStore'
 import { useSettings, type Channel } from '../store/settingsStore'
 import { useToasts } from '../store/toastStore'
@@ -127,12 +129,74 @@ function BreathGauge() {
   )
 }
 
+/**
+ * 둥둥: 손대지 않은 채 몇 초가 지나면 UI 를 천천히 숨겨 하늘만 (마우스·터치·키를 누르면 다시).
+ * 숨겨도 "일어나기" 와 별똥별 한 줄은 은은하게 남김.
+ */
+function FloatCalm() {
+  const active = useFloat((s) => s.active)
+  const calm = useFloat((s) => s.calm)
+  const note = useFloat((s) => s.note)
+  useEffect(() => {
+    const f = useFloat.getState()
+    if (!active) {
+      f.setCalm(false)
+      return
+    }
+    let timer = 0
+    const arm = () => {
+      if (useFloat.getState().calm) useFloat.getState().setCalm(false)
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => useFloat.getState().setCalm(true), CALM_AFTER_MS)
+    }
+    arm()
+    const evs = ['pointermove', 'pointerdown', 'touchstart', 'keydown', 'wheel'] as const
+    for (const e of evs) window.addEventListener(e, arm, { passive: true })
+    return () => {
+      window.clearTimeout(timer)
+      for (const e of evs) window.removeEventListener(e, arm)
+    }
+  }, [active])
+  // 머리 위 이름표도 같이 숨김 (장면 위 HTML 이라 body 에 표시)
+  useEffect(() => {
+    document.body.classList.toggle('float-calm', calm)
+    return () => document.body.classList.remove('float-calm')
+  }, [calm])
+  return (
+    <>
+      {note && (
+        <div key={note.id} className="float-note">
+          {note.text}
+        </div>
+      )}
+      {active && calm && (
+        <button className="float-wake" onClick={stopFloat}>
+          일어나기
+        </button>
+      )}
+    </>
+  )
+}
+
+const CALM_AFTER_MS = 4500
+
 /** 하단 가운데: 행동 바 (레퍼런스 산사) */
 function ActionBar() {
   const diving = useGame((s) => s.diving)
+  const floating = useFloat((s) => s.active)
   const holdDive = (v: boolean) => () => {
     input.diveButton = v
   }
+  // F: 둥둥 눕기/일어나기
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.repeat || e.code !== 'KeyF' || (e.target as HTMLElement | null)?.tagName === 'INPUT') return
+      if (useGame.getState().phase !== 'playing' || useGame.getState().customizing) return
+      toggleFloat()
+    }
+    window.addEventListener('keydown', down)
+    return () => window.removeEventListener('keydown', down)
+  }, [])
   return (
     <div className="glass actionbar">
       <button
@@ -153,8 +217,18 @@ function ActionBar() {
         <kbd>1</kbd>
       </button>
       <button
-        className="action"
+        className={`action ${floating ? 'active' : ''}`}
         disabled={diving}
+        title={floating ? '몸을 뒤집어 일어나요 (이동 키로도)' : '테왁을 안고 누워 하늘을 바라봐요 · 아무것도 안 해도 돼요'}
+        onClick={toggleFloat}
+      >
+        <span className="icon">☁️</span>
+        <span>{floating ? '일어나기' : '둥둥'}</span>
+        <kbd>F</kbd>
+      </button>
+      <button
+        className="action"
+        disabled={diving || floating}
         title={diving ? '수면에서 갈 수 있어요' : '모닥불 곁에서 쉬며 해산물을 손질해요'}
         onClick={() => travel('bulteok')}
       >
@@ -440,9 +514,12 @@ export function Hud() {
   const under = useGame((s) => s.cameraUnderwater)
   const customizing = useGame((s) => s.customizing)
   const inBulteok = useBulteok((s) => s.zone === 'bulteok')
+  const floating = useFloat((s) => s.active)
+  const calm = useFloat((s) => s.calm)
   if (customizing) return <div className="hud"><SeaCustomize /></div>
   return (
-    <div className="hud">
+    <div className={`hud ${floating ? 'floating' : ''} ${calm ? 'calm' : ''}`}>
+      {!inBulteok && <FloatCalm />}
       <div className={`vignette ${under ? 'on' : ''}`} />
       <ZoneFade />
       <JournalOverlay />
@@ -469,7 +546,7 @@ export function Hud() {
           <BulteokBar />
         ) : (
           <>
-            <BreathGauge />
+            {!floating && <BreathGauge />}
             <ActionBar />
           </>
         )}

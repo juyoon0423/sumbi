@@ -28,6 +28,12 @@ class AudioEngine {
   private files: Partial<Record<FileKey, AudioBuffer[]>> = {}
   private noise!: AudioBuffer
   private fire: GainNode | null = null
+  /** 둥둥: 귀가 물에 잠긴 느낌 — 숨비소리·효과음은 먹먹하게, 파도는 가깝고 부드럽게 */
+  private muffle!: BiquadFilterNode
+  private waveSoft!: BiquadFilterNode
+  private waveNear!: GainNode
+  /** 갈매기처럼 먹먹하게 하지 않는 먼 소리 */
+  private far!: GainNode
 
   /** 사용자 클릭 안에서 호출해야 함 (브라우저 자동재생 정책) */
   async start() {
@@ -44,11 +50,23 @@ class AudioEngine {
     this.underwaterFilter.frequency.value = 20000
     this.underwaterFilter.connect(ctx.destination)
 
+    this.muffle = ctx.createBiquadFilter()
+    this.muffle.type = 'lowpass'
+    this.muffle.frequency.value = 20000
+    this.muffle.connect(this.underwaterFilter)
+    this.waveNear = ctx.createGain()
+    this.waveNear.connect(this.underwaterFilter)
+    this.waveSoft = ctx.createBiquadFilter()
+    this.waveSoft.type = 'lowpass'
+    this.waveSoft.frequency.value = 20000
+    this.waveSoft.connect(this.waveNear)
     for (const ch of ['waves', 'sumbi', 'sfx'] as Channel[]) {
       const g = ctx.createGain()
-      g.connect(this.underwaterFilter)
+      g.connect(ch === 'waves' ? this.waveSoft : this.muffle)
       this.channels[ch] = g
     }
+    this.far = ctx.createGain()
+    this.far.connect(this.channels.waves)
     this.applyVolumes(useSettings.getState().volumes)
     useSettings.subscribe((s) => this.applyVolumes(s.volumes))
 
@@ -122,6 +140,24 @@ class AudioEngine {
   setUnderwater(under: boolean) {
     if (!this.ctx) return
     this.underwaterFilter.frequency.setTargetAtTime(under ? 650 : 20000, this.ctx.currentTime, 0.15)
+  }
+
+  /** 둥둥 (night 0~1: 밤엔 파도도 더 고요하게) */
+  setFloating(on: boolean, night = 0) {
+    if (!this.ctx) return
+    const t = this.ctx.currentTime
+    this.muffle.frequency.setTargetAtTime(on ? 900 : 20000, t, 0.6)
+    this.waveSoft.frequency.setTargetAtTime(on ? 2200 : 20000, t, 0.6)
+    this.waveNear.gain.setTargetAtTime(on ? 1.35 - 0.4 * night : 1, t, 0.8)
+  }
+
+  /** 멀리서 갈매기 "끼룩" (pan -1~1) */
+  playGull(pan = 0, v = 1) {
+    if (!this.ctx) return
+    const p = this.ctx.createStereoPanner()
+    p.pan.value = pan
+    p.connect(this.far)
+    synth.gull(this.ctx, p, v)
   }
 
   // ── 숨비소리 ──

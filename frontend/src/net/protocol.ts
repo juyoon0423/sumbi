@@ -9,11 +9,14 @@ export type ActionType =
   | 'sumbi'
   | 'wave'
   | 'harvest'
+  // 둥둥: 바다 수면에 누워 하늘 보기
+  | 'float'
+  | 'float_end'
   // 불턱에서 쉬기
   | 'tangerine'
   | 'doze'
   | 'wake'
-export type PlayerStatus = 'surface' | 'underwater' | 'sit' | 'doze'
+export type PlayerStatus = 'surface' | 'underwater' | 'float' | 'sit' | 'doze'
 export type ItemCounts = Record<ItemType, number>
 
 export interface TodayStats {

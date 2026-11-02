@@ -367,3 +367,29 @@ export function startFire(ctx: AudioContext, noise: AudioBuffer, dest: AudioNode
   crackle()
   return level
 }
+
+/** 멀리서 갈매기 "끼룩 끼룩": 높은 음이 꺾여 내려가는 소리 두세 번 */
+export function gull(ctx: AudioContext, dest: AudioNode, v = 1) {
+  const t0 = ctx.currentTime
+  const calls = 2 + Math.floor(Math.random() * 2)
+  const base = 1250 + Math.random() * 300
+  for (let i = 0; i < calls; i++) {
+    const t = t0 + i * (0.28 + Math.random() * 0.08)
+    const o = ctx.createOscillator()
+    o.type = 'sawtooth'
+    o.frequency.setValueAtTime(base * 0.8, t)
+    o.frequency.linearRampToValueAtTime(base * 1.15, t + 0.05)
+    o.frequency.exponentialRampToValueAtTime(base * 0.62, t + 0.22)
+    const bp = ctx.createBiquadFilter()
+    bp.type = 'bandpass'
+    bp.frequency.value = base * 1.1
+    bp.Q.value = 3
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.linearRampToValueAtTime(0.05 * v, t + 0.03)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24)
+    o.connect(bp).connect(g).connect(dest)
+    o.start(t)
+    o.stop(t + 0.26)
+  }
+}

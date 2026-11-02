@@ -22,6 +22,8 @@ export function currentEntry(now = Date.now()): JournalEntry {
     harvested: { ...s.harvested },
     prepped: { ...s.prepped },
     met: s.met.size,
+    floatMs: Math.round(s.floatMs),
+    shootingStar: s.shootingStar,
     preset: presetOf(env.hour),
     nick: nickOf(useCustomize.getState().custom),
   }

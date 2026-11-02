@@ -10,7 +10,7 @@ import { MAT } from './materials'
 import { TOOL_GEO, TOOL_MAT } from './tools'
 import { WALK } from '../world/bulteok/seatWalk'
 import { OOPS_DURATION } from './acts'
-import { LAND_STATES, type HaenyeoPose } from './types'
+import { FLOAT_UP, LAND_STATES, type HaenyeoPose } from './types'
 
 // 기본 도형으로 조합한 2~2.5등신 해녀 + 절차적 애니메이션.
 // 원점 = 몸 중심, 앞 = +z. 전체 키 ≈ 1.15, 머리 높이 ≈ 0.6 (약 절반)
@@ -60,7 +60,8 @@ const ease = (x: number) => smoothstep(0, 1, x)
 /** 0→1→0 부드러운 봉우리 */
 const hump = (x: number) => (x <= 0 || x >= 1 ? 0 : Math.sin(Math.PI * x) ** 2)
 
-type Gesture = 'tilt' | 'look' | 'hug'
+/** 둥둥 중: close 눈 감았다 뜨기 · yawn 하품 · squeeze 테왁 다시 끌어안기 · toe 발끝 까딱 */
+type Gesture = 'tilt' | 'look' | 'hug' | 'close' | 'yawn' | 'squeeze' | 'toe'
 
 interface Anim extends Target {
   kickPhase: number
@@ -267,6 +268,47 @@ function computeTarget(pose: HaenyeoPose, a: Anim, t: number): { tg: Target; fac
       }
       idleGesture(a, tg, face)
       if (pose.act) arms = sitAct(pose, tg, face, t)
+      break
+    }
+    case 'float': {
+      // 둥둥: 테왁을 배 위에 끌어안고 뒤로 누움 (해달처럼). 파도 따라 살짝 기울고, 다리는 살짝 떠 있음
+      tg = {
+        ...tg, pitch: -1.3, roll: Math.sin(t * 0.55) * 0.07, headTilt: 0.75, headYaw: Math.sin(t * 0.21) * 0.1,
+        armX: -1.4, armZ: -0.62, kickAmp: 0.05, kickFreq: 0.45, frog: 0, sit: 0.2,
+      }
+      const dur = a.gesture === 'close' ? 2.6 : a.gesture === 'yawn' ? 2.2 : 1.6
+      const g = a.gesture ? Math.min(1, a.gestureT / dur) : 0
+      switch (a.gesture) {
+        case 'close':
+          if (g > 0.08 && g < 0.92) face.eyes = 'line'
+          break
+        case 'yawn': {
+          const h = hump(g)
+          tg.headTilt = 0.75 - 0.4 * h
+          tg.cheeks = 0.35 * h
+          if (h > 0.25) {
+            face.eyes = 'line'
+            face.mouth = 'o'
+          }
+          break
+        }
+        case 'squeeze':
+          tg.armZ = -0.62 - 0.22 * hump(g)
+          tg.stretch = 1 - 0.04 * hump(g)
+          if (hump(g) > 0.3) face.eyes = 'happy'
+          break
+        case 'toe':
+          tg.kickAmp = 0.28 * hump(g)
+          tg.kickFreq = 2.4
+          break
+      }
+      break
+    }
+    case 'floatUp': {
+      // 몸을 뒤집어 다시 떠 있는 자세로 (살짝 비틀며 파닥)
+      const k = Math.min(1, st / FLOAT_UP)
+      tg = { ...tg, roll: 0.45 * hump(k), armZ: -0.35 + 0.7 * hump(k), kickAmp: 0.5, kickFreq: 5 }
+      face.eyes = 'round'
       break
     }
     case 'stand': {
@@ -549,6 +591,17 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
         a.gestureT = 0
         a.nextGesture = t + 3.5 + Math.random() * 4
       }
+    } else if (pose.state === 'float') {
+      // 둥둥: 아주 가끔 작은 몸짓 (멍때리는 중이라 드문드문)
+      if (a.gesture) {
+        a.gestureT += dt
+        if (a.gestureT > (a.gesture === 'close' ? 2.6 : a.gesture === 'yawn' ? 2.2 : 1.6)) a.gesture = null
+      } else if (pose.stateTime > 3 && t > a.nextGesture) {
+        const all: Gesture[] = ['close', 'close', 'yawn', 'squeeze', 'toe', 'toe']
+        a.gesture = all[Math.floor(Math.random() * all.length)]
+        a.gestureT = 0
+        a.nextGesture = t + 4 + Math.random() * 6
+      }
     }
 
     const { tg, face, arms } = computeTarget(pose, a, t)
@@ -558,7 +611,13 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
     ]
     for (const key of lerpKeys) a[key] += (tg[key] - a[key]) * k
     // 입수 회전은 빠르게, 하강 → 엎드림 전환은 천천히 부드럽게
-    const pitchRate = pose.state === 'entering' ? 9 : pose.state === 'underIdle' || pose.state === 'underSwim' ? 3.2 : 5
+    // 둥둥은 천천히 뒤로 누움
+    const pitchRate =
+      pose.state === 'entering' ? 9
+      : pose.state === 'underIdle' || pose.state === 'underSwim' ? 3.2
+      : pose.state === 'float' ? (pose.stateTime < 2.5 ? 1.3 : 3)
+      : pose.state === 'floatUp' ? 4.5
+      : 5
     a.pitch += (tg.pitch - a.pitch) * damp(pitchRate, dt)
     a.goggles += (tg.goggles - a.goggles) * damp(9, dt)
     a.cheeks += (tg.cheeks - a.cheeks) * damp(10, dt)

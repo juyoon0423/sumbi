@@ -158,19 +158,27 @@ class BulteokTest {
         join(r, "token-aaaa");
         assertThat(r.act(2, "tangerine", null, now)).isFalse(); // 바다에서 귤 X
         assertThat(r.act(2, "breathe", null, now)).isFalse(); // 없어진 행동(숨 고르기)은 무시
-        r.act(2, "dive", null, now);
+        assertThat(r.act(2, "float", null, now)).isTrue(); // 둥둥: 수면에 누움
+        assertThat(r.get(2).info().st()).isEqualTo("float");
+        assertThat(r.act(2, "float", null, now)).isFalse(); // 이미 누워 있음
+        assertThat(r.act(2, "float_end", null, now)).isTrue();
+        assertThat(r.act(2, "float_end", null, now)).isFalse();
+        assertThat(r.act(2, "float", null, now)).isTrue();
+        r.act(2, "dive", null, now); // 잠수하면 둥둥도 끝
         assertThat(r.get(2).info().st()).isEqualTo("underwater");
+        assertThat(r.act(2, "float", null, now)).isFalse(); // 물속에선 못 누움
         r.act(2, "surface", null, now);
 
         now += 1000;
         r.changeZone(2, "bulteok", now);
+        assertThat(r.act(2, "float", null, now)).isFalse(); // 불턱에서 둥둥 X
         assertThat(r.act(2, "doze", null, now)).isTrue();
         assertThat(r.get(2).info().st()).isEqualTo("doze");
         assertThat(r.act(2, "wake", null, now)).isTrue();
         assertThat(r.act(2, "tangerine", null, now)).isTrue();
         assertThat(r.act(2, "tangerine", null, now + 1000)).isFalse(); // 아직 먹는 중
         assertThat(other.of(ServerMessage.Evt.class)).extracting(ServerMessage.Evt::a)
-            .containsExactly("dive", "surface", "doze", "wake", "tangerine");
+            .containsExactly("float", "float_end", "float", "dive", "surface", "doze", "wake", "tangerine");
     }
 
     @Test

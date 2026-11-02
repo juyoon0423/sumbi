@@ -1075,3 +1075,73 @@ button {
     opacity: 1;
   }
 }
+
+/* ── 둥둥: 하늘만 보이게 UI 를 천천히 숨김 ── */
+.hud.floating > * {
+  transition: opacity 1.6s ease;
+}
+.hud.calm > :not(.float-wake):not(.float-note) {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+body.float-calm .tag-stack {
+  opacity: 0;
+  transition: opacity 1.6s ease;
+}
+.float-wake {
+  position: absolute;
+  right: calc(20px + env(safe-area-inset-right));
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  padding: 9px 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(20, 34, 48, 0.28);
+  backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.6;
+  pointer-events: auto;
+  cursor: pointer;
+  animation: soft-fade-in 2s ease both;
+}
+.float-wake:hover {
+  opacity: 0.95;
+}
+.float-note {
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: rgba(10, 18, 34, 0.35);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: float-note 4.2s ease both;
+}
+@keyframes float-note {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  15%,
+  75% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+}
+/* 다른 해녀가 둥둥 중: 머리 위 ☁️ / ✨ */
+.float-mark {
+  font-size: 18px;
+  opacity: 0;
+  transition: opacity 1.2s ease;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.25));
+}

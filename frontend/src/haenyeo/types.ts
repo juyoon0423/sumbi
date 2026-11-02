@@ -11,11 +11,16 @@ export type HaenyeoState =
   | 'harvesting'
   | 'ascending'
   | 'sumbi'
+  | 'float' // 둥둥: 테왁을 배 위에 안고 누워 하늘 보기
+  | 'floatUp' // 둥둥 끝: 몸을 뒤집어 다시 떠 있는 자세로
   | 'sit' // 불턱에 앉아 불 쬐기
   | 'rise' // 자리에서 일어나기
   | 'walk' // 불턱에서 뒤뚱뒤뚱 걷기 (제자리에서 돌기 포함)
   | 'settle' // 털썩 앉기
   | 'stand' // 담 밖에 서서 불 쬐기 (자리가 다 찼을 때)
+
+/** 둥둥에서 일어나는(몸 뒤집기) 시간 (초) */
+export const FLOAT_UP = 0.9
 
 /** 땅 위(불턱) 자세: 바다 위처럼 둥실거리지 않음 */
 export const LAND_STATES: ReadonlySet<HaenyeoState> = new Set(['sit', 'rise', 'walk', 'settle', 'stand'])
