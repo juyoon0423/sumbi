@@ -32,8 +32,12 @@ const SLOTS: Slot[] = [
   { id: 'idle', label: '대기 (몸짓)', nick: '느린 파도', loop: 1e9, drive: (p, t) => at(p, 'surfaceIdle', t) },
   { id: 'swim', label: '헤엄', nick: '작은 소라', loop: 1e9, drive: (p, t) => { at(p, 'surfaceSwim', t); p.move = 1 } },
   {
-    id: 'dive', label: '잠수 (웅크림 → 쏙)', nick: '고요한 물결', loop: 2.4, rotY: 1.1,
-    drive: (p, t) => (t < 0.8 ? at(p, 'surfaceIdle', t + 5) : at(p, 'entering', t - 0.8)),
+    id: 'dive', label: '잠수 (웅크림 → 쏙 → 하강 → 엎드림)', nick: '고요한 물결', loop: 4.2, rotY: 1.4,
+    drive: (p, t) =>
+      t < 0.8 ? at(p, 'surfaceIdle', t + 5)
+      : t < 1.5 ? at(p, 'entering', t - 0.8)
+      : t < 2.9 ? at(p, 'descending', t - 1.5)
+      : at(p, 'underIdle', t - 2.9),
   },
   { id: 'under', label: '물속 개구리헤엄', nick: '따뜻한 돌담', loop: 1e9, rotY: 1.1, drive: (p, t) => { at(p, 'underSwim', t); p.move = 1 } },
   {

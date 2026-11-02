@@ -11,6 +11,7 @@ export const CONFIG = {
   underwaterSpeed: 2.1,
   diveSpeed: 1.7,
   ascendSpeed: 2.1,
+  levelOffHeight: 1.3, // 바닥에서 이 높이 안쪽이면 머리-아래 하강 → 엎드린 개구리헤엄
 
   // 동작 시간(초)
   enterDuration: 0.7,

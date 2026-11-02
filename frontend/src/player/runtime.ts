@@ -30,5 +30,6 @@ export const cameraRig = {
 /** 이펙트 요청 큐 (LocalPlayer → 이펙트 컴포넌트) */
 export const fx = {
   bubbles: [] as Vector3[],
-  splashes: [] as Vector3[],
+  /** 수면 물보라. power 1 = 보통, 클수록 물방울이 많고 높이 튐 */
+  splashes: [] as { pos: Vector3; power: number }[],
 }

@@ -60,11 +60,15 @@ export function FollowCamera() {
     const dt = Math.min(rawDt, 0.05)
     const t = clock.elapsedTime
     const p = player.pos
-    const under = UNDERWATER_STATES.has(player.pose.state)
+    // 입수(entering) 동안은 카메라를 물 위에 두어 웅크림·물보라가 보이게 함
+    const state = player.pose.state
+    const under = UNDERWATER_STATES.has(state) && state !== 'entering'
 
     target.current.x += (p.x - target.current.x) * damp(8, dt)
     target.current.z += (p.z - target.current.z) * damp(8, dt)
-    target.current.y += (p.y + 0.55 - target.current.y) * damp(under ? 5 : 3, dt)
+    // 머리를 아래로 하고 내려갈 땐 몸 중심이 낮아지고 계속 내려가므로 조금 아래를, 더 빠르게 따라감
+    const headDown = state === 'descending'
+    target.current.y += (p.y + (headDown ? -0.15 : 0.55) - target.current.y) * damp(headDown ? 9 : under ? 5 : 3, dt)
 
     if (useGame.getState().phase === 'entry') {
       // 입장 전: 내 해녀 주변을 천천히 도는 풍경

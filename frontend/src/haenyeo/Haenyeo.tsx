@@ -90,21 +90,30 @@ function computeTarget(pose: HaenyeoPose, a: Anim, t: number): { tg: Target; fac
         // 준비: 살짝 웅크리고 팔을 머리 위로
         tg = { ...tg, pitch: -0.2, headTilt: 0.25, armX: -2.9, armZ: 0.1, stretch: 0.8, kickAmp: 0.05, goggles: 1 }
       } else {
-        // 머리부터 쏙
-        tg = { ...tg, pitch: 2.6, armX: -3.0, armZ: 0.05, stretch: 1.14, kickAmp: 0.4, kickFreq: 5, goggles: 1 }
+        // 몸 전체를 앞으로 돌려 머리부터 쏙 (머리가 아래로 약 75°)
+        tg = { ...tg, pitch: 2.9, armX: -3.05, armZ: 0.05, stretch: 1.14, kickAmp: 0.5, kickFreq: 6, goggles: 1 }
       }
       face.eyes = 'line'
       break
     }
+    case 'descending':
+      // 머리를 아래로, 팔은 머리 위로 모으고 다리로 파닥파닥 차며 내려감
+      tg = {
+        ...tg, pitch: 2.82 + Math.sin(t * 1.4) * 0.04, roll: Math.sin(a.kickPhase * Math.PI * 2) * 0.06,
+        armX: -3.05, armZ: 0.1, kickAmp: 0.9, kickFreq: 4.2, stretch: 1.06, goggles: 1,
+      }
+      face.eyes = 'round'
+      break
     case 'underIdle':
-      tg = { ...tg, pitch: 0.75, armX: -0.8 + Math.sin(t * 2) * 0.3, armZ: 0.6, kickAmp: 1, kickFreq: 0.9, frog: 1, goggles: 1 }
+      // 바닥 위에 엎드려 떠 있기: 팔로 살살 물을 저으며 개구리발
+      tg = { ...tg, pitch: 1.3, headTilt: -0.35, armX: -1.5 + Math.sin(t * 2) * 0.3, armZ: 0.7, kickAmp: 0.8, kickFreq: 0.9, frog: 1, goggles: 1 }
       face.eyes = 'round'
       break
     case 'underSwim': {
       // 개구리헤엄: 다리를 모았다 차는 박자에 맞춰 팔도 젓기
       const s = (Math.sin(a.kickPhase * Math.PI * 2) + 1) / 2
       tg = {
-        ...tg, pitch: 1.35, armX: -2.7 + 1.0 * s, armZ: 0.15 + 0.75 * s, kickAmp: 1, kickFreq: 1.5,
+        ...tg, pitch: 1.45, headTilt: -0.3, armX: -2.7 + 1.0 * s, armZ: 0.15 + 0.75 * s, kickAmp: 1, kickFreq: 1.5,
         frog: 1, goggles: 1, stretch: 1 + 0.06 * (1 - s),
       }
       face.eyes = 'round'
@@ -243,7 +252,9 @@ export function Haenyeo({ pose, look }: { pose: HaenyeoPose; look: HaenyeoLook }
       'roll', 'headTilt', 'headYaw', 'headRoll', 'armX', 'armZ', 'kickAmp', 'kickFreq', 'frog', 'stretch',
     ]
     for (const key of lerpKeys) a[key] += (tg[key] - a[key]) * k
-    a.pitch += (tg.pitch - a.pitch) * damp(pose.state === 'entering' ? 10 : 5, dt)
+    // 입수 회전은 빠르게, 하강 → 엎드림 전환은 천천히 부드럽게
+    const pitchRate = pose.state === 'entering' ? 9 : pose.state === 'underIdle' || pose.state === 'underSwim' ? 3.2 : 5
+    a.pitch += (tg.pitch - a.pitch) * damp(pitchRate, dt)
     a.goggles += (tg.goggles - a.goggles) * damp(9, dt)
     a.cheeks += (tg.cheeks - a.cheeks) * damp(10, dt)
     a.kickPhase += dt * a.kickFreq * (0.6 + pose.move * 0.6)

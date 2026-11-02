@@ -64,6 +64,7 @@ export function LocalPlayer() {
 
     const s = pose.state
     const underwater = UNDERWATER_STATES.has(s)
+    const floor = terrainY(p.pos.x, p.pos.z) + CONFIG.floorClearance
     let speed = 0
 
     // ── 상태 머신 ──
@@ -81,17 +82,26 @@ export function LocalPlayer() {
         break
       }
       case 'entering': {
-        speed = CONFIG.underwaterSpeed * 0.5
-        if (pose.stateTime > CONFIG.enterDuration) setState(pose, 'underIdle')
+        // 웅크림(enterCrouch) → 머리부터 입수. 머리가 물에 닿는 순간 물보라 + 첨벙
+        speed = CONFIG.underwaterSpeed * 0.3
+        if (pose.stateTime >= CONFIG.enterCrouch && pose.stateTime - dt < CONFIG.enterCrouch) {
+          fx.splashes.push({ pos: p.pos.clone(), power: 2.2 })
+          audio.playSplash()
+        }
+        if (pose.stateTime > CONFIG.enterDuration) setState(pose, 'descending')
         break
       }
+      case 'descending':
       case 'underIdle':
       case 'underSwim': {
-        speed = CONFIG.underwaterSpeed
-        setState(pose, moveAmt > 0.1 ? 'underSwim' : 'underIdle')
+        speed = CONFIG.underwaterSpeed * (s === 'descending' ? 0.6 : 1)
         if (!diveHeld || p.forcedAscend) {
           setState(pose, 'ascending')
           break
+        }
+        // 머리를 아래로 하고 내려가다가, 바닥 가까이에서 몸을 눕혀 개구리헤엄
+        if (s !== 'descending' || p.pos.y - floor < CONFIG.levelOffHeight) {
+          setState(pose, moveAmt > 0.1 ? 'underSwim' : 'underIdle')
         }
         const item = findHarvestable(p.pos, CONFIG.harvestRadius)
         if (item) {
@@ -109,7 +119,7 @@ export function LocalPlayer() {
       case 'ascending': {
         speed = CONFIG.underwaterSpeed * 0.75
         // 숨이 남아 있으면 다시 Space를 눌러 내려갈 수 있음
-        if (diveHeld && !p.forcedAscend && !p.diveLock && p.breath > 0) setState(pose, 'underSwim')
+        if (diveHeld && !p.forcedAscend && !p.diveLock && p.breath > 0) setState(pose, 'descending')
         break
       }
     }
@@ -167,19 +177,27 @@ export function LocalPlayer() {
 
     // ── 수직 이동 ──
     const surf = surfaceY(p.pos.x, p.pos.z, t)
-    const floor = terrainY(p.pos.x, p.pos.z) + CONFIG.floorClearance
+    const floorHere = terrainY(p.pos.x, p.pos.z) + CONFIG.floorClearance
     switch (pose.state) {
       case 'entering': {
-        // 살짝 웅크렸다가 머리부터 쏙 들어감
-        const k = clamp((pose.stateTime - CONFIG.enterCrouch) / (CONFIG.enterDuration - CONFIG.enterCrouch), 0, 1)
-        p.pos.y = Math.max(floor, surf - k * k * 1.1)
+        if (pose.stateTime < CONFIG.enterCrouch) {
+          // 웅크림: 수면에서 살짝 가라앉으며 몸을 움츠림
+          p.pos.y += (surf - 0.05 - p.pos.y) * damp(10, dt)
+        } else {
+          // 머리부터 들어가며 하강 속도를 하강 단계 속도까지 올림
+          const k = clamp((pose.stateTime - CONFIG.enterCrouch) / (CONFIG.enterDuration - CONFIG.enterCrouch), 0, 1)
+          p.pos.y = Math.max(floorHere, p.pos.y - CONFIG.diveSpeed * Math.min(1, 0.1 + k * 1.2) * dt)
+        }
         break
       }
+      case 'descending':
       case 'underIdle':
       case 'underSwim':
       case 'harvesting': {
-        if (pose.state !== 'harvesting') p.pos.y -= CONFIG.diveSpeed * dt
-        p.pos.y = clamp(p.pos.y, floor, surf - 0.6)
+        // 하강 중엔 빠르게, 바닥 근처에선 비탈을 따라 천천히 가라앉음
+        if (pose.state === 'descending') p.pos.y -= CONFIG.diveSpeed * dt
+        else if (pose.state !== 'harvesting') p.pos.y -= CONFIG.diveSpeed * 0.5 * dt
+        p.pos.y = clamp(p.pos.y, floorHere, surf - 0.6)
         break
       }
       case 'ascending': {
@@ -196,7 +214,7 @@ export function LocalPlayer() {
       pose.waveTime += dt
       if (pose.waveTime > CONFIG.waveDuration) pose.waveTime = -1
     }
-    if (consumeWave() && pose.waveTime < 0 && pose.state !== 'entering' && pose.state !== 'ascending') {
+    if (consumeWave() && pose.waveTime < 0 && pose.state !== 'entering' && pose.state !== 'descending' && pose.state !== 'ascending') {
       pose.waveTime = 0
       audio.playChime()
       useBubbles.getState().sayself('손 흔들어 인사했어요')
@@ -208,7 +226,9 @@ export function LocalPlayer() {
       const rate = pose.state === 'ascending' ? 0.12 : 0.35
       if (t > timers.current.bubbleFx) {
         fwd.set(Math.sin(p.yaw), 0, Math.cos(p.yaw))
-        fx.bubbles.push(tmp.copy(p.pos).addScaledVector(fwd, 0.25).setY(p.pos.y + 0.35).clone())
+        // 입 근처에서 기포: 머리가 아래인 하강 중엔 몸 아래쪽
+        const mouthY = pose.state === 'descending' || pose.state === 'entering' ? -0.3 : 0.35
+        fx.bubbles.push(tmp.copy(p.pos).addScaledVector(fwd, 0.25).setY(p.pos.y + mouthY).clone())
         timers.current.bubbleFx = t + rate * (0.6 + Math.random() * 0.8)
       }
       if (t > timers.current.bubbleSound) {
@@ -256,8 +276,7 @@ function startDive(t: number) {
   p.diveStartedAt = t
   p.forcedAscend = false
   p.tewak.attached = false
-  fx.splashes.push(p.pos.clone())
-  audio.playSplash()
+  // 물보라·첨벙 소리는 웅크림이 끝나고 머리가 물에 닿을 때 (상태 머신 'entering')
   useGame.getState().setDiving(true)
   net.send({ t: 'act', a: 'dive' })
 }
@@ -282,7 +301,7 @@ function arriveSurface(t: number) {
   p.forcedAscend = false
   p.tewak.attached = true
   useGame.getState().setDiving(false)
-  fx.splashes.push(p.pos.clone())
+  fx.splashes.push({ pos: p.pos.clone(), power: 1.2 })
   net.send({ t: 'act', a: 'surface' })
   if (dived >= CONFIG.sumbiMinDive) {
     setState(p.pose, 'sumbi')

@@ -5,6 +5,7 @@ export type HaenyeoState =
   | 'surfaceIdle'
   | 'surfaceSwim'
   | 'entering'
+  | 'descending'
   | 'underIdle'
   | 'underSwim'
   | 'harvesting'
@@ -13,6 +14,7 @@ export type HaenyeoState =
 
 export const UNDERWATER_STATES: ReadonlySet<HaenyeoState> = new Set([
   'entering',
+  'descending',
   'underIdle',
   'underSwim',
   'harvesting',

@@ -235,7 +235,7 @@ function Splashes() {
   )
   const cursor = useRef(0)
   // 물방울 입자
-  const DROPS = 36
+  const DROPS = 48
   const drops = useMemo(() => Array.from({ length: DROPS }, () => ({ pos: new Vector3(), vel: new Vector3(), life: -1 })), [])
   const dropRefs = useRef<(Mesh | null)[]>([])
   const dropGeo = useMemo(() => new SphereGeometry(0.035, 8, 6), [])
@@ -246,14 +246,16 @@ function Splashes() {
     const dt = Math.min(rawDt, 0.05)
     while (fx.splashes.length) {
       const it = items[cursor.current++ % POOL]
-      it.pos.copy(fx.splashes.shift()!)
+      const { pos, power } = fx.splashes.shift()!
+      it.pos.copy(pos)
       it.life = 0
-      for (let k = 0; k < 12; k++) {
+      const n = Math.round(12 * power)
+      for (let k = 0; k < n; k++) {
         const d = drops[dropCursor.current++ % DROPS]
         const a = Math.random() * Math.PI * 2
-        const sp = 0.6 + Math.random() * 1.2
+        const sp = (0.5 + Math.random() * 1.1) * Math.sqrt(power)
         d.pos.set(it.pos.x, waveHeight(it.pos.x, it.pos.z, clock.elapsedTime) + 0.05, it.pos.z)
-        d.vel.set(Math.cos(a) * sp, 1.8 + Math.random() * 1.6, Math.sin(a) * sp)
+        d.vel.set(Math.cos(a) * sp, (1.8 + Math.random() * 1.8) * Math.sqrt(power), Math.sin(a) * sp)
         d.life = 0
       }
     }
