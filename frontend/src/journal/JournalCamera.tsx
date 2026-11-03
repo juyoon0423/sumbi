@@ -1,6 +1,6 @@
 import { useThree } from '@react-three/fiber'
 import { useEffect } from 'react'
-import { PerspectiveCamera, Vector3 } from 'three'
+import { NeutralToneMapping, PerspectiveCamera, Vector3 } from 'three'
 import { player } from '../player/runtime'
 import { bulteokFrontYaw } from '../world/bulteok/seatWalk'
 import { setShooter } from './capture'
@@ -25,7 +25,11 @@ export function JournalCamera() {
       cam.position.set(look.x + Math.sin(yaw) * dist, look.y + (player.zone === 'bulteok' ? 0.85 : 0.55), look.z + Math.cos(yaw) * dist)
       cam.lookAt(look)
       cam.updateProjectionMatrix()
+      // 블룸을 쓰는 동안엔 렌더러 톤 매핑이 꺼져 있으므로 (마무리 효과가 대신 함) 사진을 찍을 때만 켬
+      const tm = gl.toneMapping
+      gl.toneMapping = NeutralToneMapping
       gl.render(scene, cam)
+      gl.toneMapping = tm
       out.getContext('2d')!.drawImage(src, 0, 0, src.width, src.height, 0, 0, out.width, out.height)
     })
     return () => setShooter(null)

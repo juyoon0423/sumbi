@@ -157,7 +157,8 @@ function makeMaterial() {
         col = mix(col, uHorizon, hz * 0.72);
         a *= (1.0 - hz * 0.3) * smoothstep(-0.01, 0.05, vd.y);
         gl_FragColor = vec4(col, a * 0.96);
-        #include <colorspace_fragment>
+        #include <tonemapping_fragment>
+            #include <colorspace_fragment>
       }
     `,
   })

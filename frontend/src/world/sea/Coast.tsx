@@ -10,6 +10,7 @@ import {
 } from 'three'
 import { seededRandom } from '../../lib/math'
 import { shoreZ, terrainY } from '../terrain'
+import { patchAerial, patchBasalt } from './surfaceDetail'
 
 // 검은 현무암 바위, 멀리 한라산과 오름 (불턱 돌담은 world/bulteok)
 
@@ -32,7 +33,11 @@ export function rockGeometry(seed: number) {
   return g
 }
 
-export const ROCK_MAT = new MeshStandardMaterial({ color: '#36363a', roughness: 0.95, flatShading: true })
+export const ROCK_MAT = new MeshStandardMaterial({ color: '#3a3a3e', roughness: 0.92, flatShading: true })
+patchBasalt(ROCK_MAT)
+
+/** 산·오름의 대기 원근감 색 (SkyAndLight 가 시간대에 맞춰 갱신) */
+export const mountainHaze = { color: { value: new Color('#9fb8cc') }, amount: { value: 0.75 } }
 const ROCK_VARIANTS = 3
 
 interface RockPlacement {
@@ -134,7 +139,11 @@ function Mountains() {
       ),
     [],
   )
-  const mat = useMemo(() => new MeshStandardMaterial({ color: '#5f7d6c', roughness: 1 }), [])
+  const mat = useMemo(() => {
+    const m = new MeshStandardMaterial({ color: '#56705f', roughness: 1 })
+    patchAerial(m, mountainHaze.color, mountainHaze.amount)
+    return m
+  }, [])
   const oreums: [number, number, number][] = [
     [-260, -330, 1.0],
     [190, -420, 1.3],

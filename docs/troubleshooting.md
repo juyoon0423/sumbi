@@ -258,3 +258,35 @@
 - 옛 브라우저 저장값은 시작할 때 지움(`localStorage.removeItem('sumbi.breathe')`), 옛 일지 기록에 남은 필드는 그냥 무시(타입에서 빠져도 JSON 읽기는 안 깨짐).
 - 파일을 지운 뒤 Vite 가 옛 import 를 붙잡고 있으면 가져오던 파일을 저장(touch)해서 다시 읽게 함 (위 "Failed to load url" 항목).
 - 백엔드 서버를 다시 켜야 지운 메시지(`breathe`)를 거절함 — 켜 둔 서버는 옛 코드.
+
+## 하늘·바다 v2 (2026-11-04)
+
+### 후처리(EffectComposer)를 켜자 하늘이 회색으로 바램
+- **원인**: `EffectComposer` 는 렌더러 톤 매핑을 `NoToneMapping` 으로 바꿈 → `ToneMapping` 효과를 따로 넣어야 하는데, ACES 는 파랑·노을 채도를 많이 깎음.
+- **해결**: `ToneMappingMode.NEUTRAL`. 블룸이 꺼진 낮음 단계(후처리 없음)도 같은 색이 나오게 Canvas `gl.toneMapping = NeutralToneMapping`, 물질 일지 사진(`JournalCamera`, 직접 `gl.render`)도 그동안만 Neutral 로.
+- 직접 만든 ShaderMaterial 은 `#include <tonemapping_fragment>` 가 있어야 톤 매핑을 따름.
+
+### `onBeforeCompile` 셰이더 컴파일 오류 ("'material' : syntax error")
+- 문자열 치환으로 GLSL 을 끼워 넣다가 `}` 가 하나 남아 함수 밖으로 나감. 콘솔의 `THREE.WebGLProgram` 오류 줄 번호 근처를 보면 끼워 넣은 부분이 보임. 끼워 넣는 코드는 `{ ... }` 블록 하나로 감싸 변수 이름 충돌도 막음.
+
+### 바깥 바다(고리 모양)에 포말이 온통 깔림
+- 포말·옥빛은 정점마다 넣은 물 깊이 `aDepth` 로 정함. 바깥 `RingGeometry` 엔 그 속성이 없어 0(= 해안선)으로 읽힘 → 바깥 고리에도 `aDepth` 를 60 으로 채움.
+
+### 다른 해녀를 파도 높이에 맞췄더니 헤엄 동작이 떨림
+- 보간 위치(`rm.pos`)의 y 를 바꾸면 그 값으로 계산하는 속도가 파도만큼 흔들림. 보이는 위치(`shown`)만 따로 두고 `root.position` 에만 씀. 불턱 걷기처럼 바다가 아닌 곳은 `rm.pos` 그대로.
+
+### 물속에서 수평선 쪽에 밝은 선
+- 하늘 돔(`fog: false`)이 물속에서도 그려져 수면 아래로 보임. 카메라가 물속이면 하늘 돔도 끔 (별·구름과 같은 방식).
+
+### 세로 휴대폰 화면 둥둥에서 밤에 달이 안 보임
+- 가로 화면 기준 옆 구도(`side`)라 좁은 세로 화면에선 달이 화면 밖. `FollowCamera` 에서 화면 비율로 `portrait` 배율을 구해 옆 거리를 줄이고 방향을 머리·달 쪽 사이로 섞음.
+
+### 프레임 수 재기 (`capture-skysea.mjs ... fps`)
+- headless Chrome 은 60fps 에 묶여 차이가 안 보임 → `--disable-gpu-vsync --disable-frame-rate-limit`. 같은 조건에서도 실행마다 ±40% 흔들리므로 여러 번 재서 범위로 적음 (`docs/screenshots/sky-sea-v2/fps.md`). 실제 휴대폰 값은 아님.
+
+### 캡처 스크립트에서 불턱 이동이 시간 초과
+- 물속에서 올라오는 중엔 `travel('bulteok')` 이 거절됨. `pose.state === 'surfaceIdle'` 이 될 때까지 기다린 뒤 이동.
+
+### `capture-journal.mjs` "함께한 해녀" 실패
+- 같은 백엔드(:8080)에 사용자 Chrome 같은 다른 브라우저가 붙어 있으면 함께한 해녀 수가 늘어남. 다른 연결을 닫고 다시 돌림 (`lsof -i tcp:8080` 으로 확인).
+

@@ -11,6 +11,8 @@ const BASE = process.env.SUMBI_URL ?? 'http://localhost:5173'
 const out = process.argv[2] ?? 'captures/skysea'
 const tag = process.argv[3] ?? 'cur'
 const only = process.argv[4] ?? 'all'
+/** 품질 고정 (프레임 수 비교용): SUMBI_QUALITY=high|medium|low */
+const Q = process.env.SUMBI_QUALITY ? `&quality=${process.env.SUMBI_QUALITY}` : ''
 mkdirSync(out, { recursive: true })
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--ignore-gpu-blocklist', ...(only === 'fps' ? ['--disable-gpu-vsync', '--disable-frame-rate-limit'] : [])] })
@@ -157,7 +159,7 @@ if (only === 'all' || only === 'fps') {
     ['day', 13],
     ['night', 23],
   ]) {
-    const { ctx, page } = await open(`?hour=${hour}`, {
+    const { ctx, page } = await open(`?hour=${hour}${Q}`, {
       viewport: { width: 390, height: 844 },
       deviceScaleFactor: 3,
       isMobile: true,

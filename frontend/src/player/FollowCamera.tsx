@@ -153,18 +153,24 @@ export function FollowCamera() {
         floatCam.fov += (58 - floatCam.fov) * k
       }
       const V = FLOAT_VIEW
+      // 세로 화면(휴대폰)은 좌우가 좁아서 옆으로 덜 비켜 서고, 머리 쪽(밤엔 달 쪽)으로 시선을 더 돌림 → 달이 화면 안에
+      const portrait = clamp((1 - cam.aspect) / 0.5, 0, 1)
+      const side = V.side * (1 - 0.55 * portrait)
       const fx = Math.sin(player.yaw)
       const fz = Math.cos(player.yaw)
       // 해녀 오른쪽 = (cos, -sin)
       const rx = Math.cos(player.yaw)
       const rz = -Math.sin(player.yaw)
-      const d = desired.current.set(p.x + fx * V.back + rx * V.side, 0, p.z + fz * V.back + rz * V.side)
+      const d = desired.current.set(p.x + fx * V.back + rx * side, 0, p.z + fz * V.back + rz * side)
       d.y = waveHeight(d.x, d.z, t) + V.up
       // 머리·테왁 쪽을 기준으로 시선을 잡고 그보다 elev 만큼 올려다봄 → 해녀는 늘 화면 아래, 나머지는 하늘
       const hx = p.x - fx * 0.2 - d.x
       const hz = p.z - fz * 0.2 - d.z
       const hy = waveHeight(p.x, p.z, t) + 0.12 - d.y
-      const az = Math.atan2(hx, hz) + V.turn + floatCam.yaw
+      const azHead = Math.atan2(hx, hz)
+      // 발 → 머리 방향 (누울 때 머리를 달·해 쪽으로 둠)
+      const azAxis = Math.atan2(-fx, -fz)
+      const az = lerpAngle(azHead, azAxis, 0.5 * portrait) + V.turn + floatCam.yaw
       const el = Math.atan2(hy, Math.hypot(hx, hz)) + V.elev + floatCam.pitch
       floatLook.set(d.x + Math.sin(az) * Math.cos(el) * 10, d.y + Math.sin(el) * 10, d.z + Math.cos(az) * Math.cos(el) * 10)
       // 처음엔 천천히 내려감

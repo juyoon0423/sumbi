@@ -2,6 +2,7 @@ import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import { BackSide, ShaderMaterial, SphereGeometry, Vector3, type Mesh } from 'three'
 import { damp } from '../../lib/math'
+import { useGame } from '../../store/gameStore'
 import { env, targetHour } from './env'
 import { displayMoonPhase } from './moon'
 import { samplePalette } from './palette'
@@ -133,6 +134,7 @@ export function TimeOfDay() {
             col = mix(col, moon, cover * uMoonVis);
 
             gl_FragColor = vec4(col, 1.0);
+            #include <tonemapping_fragment>
             #include <colorspace_fragment>
           }
         `,
@@ -185,6 +187,8 @@ export function TimeOfDay() {
     material.uniforms.uStars.value = env.stars
     material.uniforms.uTime.value = clock.elapsedTime
     sky.current.position.copy(camera.position)
+    // 물속에선 하늘 돔을 숨김 (수면 가장자리 틈으로 밝은 하늘이 줄처럼 보이지 않게, 배경은 물속 안개 색)
+    sky.current.visible = !useGame.getState().cameraUnderwater
   }, -1)
 
   return <mesh ref={sky} geometry={geometry} material={material} frustumCulled={false} renderOrder={-10} />

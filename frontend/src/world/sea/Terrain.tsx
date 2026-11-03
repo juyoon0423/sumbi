@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import { AdditiveBlending, BufferAttribute, Color, MeshStandardMaterial, PlaneGeometry, ShaderMaterial } from 'three'
 import { smoothstep } from '../../lib/math'
 import { terrainY } from '../terrain'
+import { detailUniforms, patchBasalt } from './surfaceDetail'
 
 // 해저 + 해안 + 육지를 한 장의 지형으로. 가운데는 촘촘하고 멀어질수록 듬성듬성한 격자.
 
@@ -88,11 +89,17 @@ const causticsMaterial = () =>
 
 export function Terrain() {
   const geometry = useMemo(buildGeometry, [])
-  const material = useMemo(() => new MeshStandardMaterial({ vertexColors: true, roughness: 1 }), [])
+  const material = useMemo(() => {
+    const m = new MeshStandardMaterial({ vertexColors: true, roughness: 1 })
+    // 해안 현무암 띠(풀밭 아래)와 물속 모래에 무늬
+    patchBasalt(m, { sand: true, maxY: 1.9, poreScale: 0.8 })
+    return m
+  }, [])
   const caustics = useMemo(causticsMaterial, [])
 
   useFrame(({ clock }) => {
     caustics.uniforms.uTime.value = clock.elapsedTime
+    detailUniforms.uTime.value = clock.elapsedTime
   })
 
   return (

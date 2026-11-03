@@ -87,7 +87,8 @@ if (import.meta.env.DEV) {
     import('../world/sky/Gulls'),
     import('../world/sky/ShootingStar'),
     import('../player/FollowCamera'),
-  ]).then(([rt, sf, inp, rm, bt, zone, time, session, layout, float, gulls, star, fcam]) => {
+    import('../lib/quality'),
+  ]).then(([rt, sf, inp, rm, bt, zone, time, session, layout, float, gulls, star, fcam, quality]) => {
     ;(window as unknown as Record<string, unknown>).__sumbi = {
       player: rt.player,
       cameraRig: rt.cameraRig,
@@ -95,6 +96,8 @@ if (import.meta.env.DEV) {
       input: inp,
       remotes: rm.remotes,
       game: useGame,
+      /** 그래픽 품질: quality.getState().level / quality.getState().set('low') */
+      quality: quality.useQuality,
       bulteok: bt.useBulteok,
       travel: zone.travel,
       /** 불턱 빈자리 누르기: seat(5) */
