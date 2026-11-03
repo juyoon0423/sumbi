@@ -85,7 +85,7 @@
 > 새 세션은 여기부터. 1번부터 차례로.
 
 1. **둥둥·하늘·바다 마무리** — 기능은 완성·커밋됨. 사용자가 직접 해 보고 느낌 피드백(하늘·바다 v2 색감, 블룸 세기 `world/Effects.tsx`, 품질 단계 `lib/quality.ts`, 구도·UI 사라지는 시간 4.5초·갈매기 22~48초/별똥별 45~115초 빈도·물에 잠긴 소리 크기)이 오면 값만 조정. 값 위치: `player/FollowCamera.tsx` `FLOAT_VIEW`, `ui/Hud.tsx` `CALM_AFTER_MS`, `world/sky/Gulls.tsx`·`ShootingStar.tsx` 의 `next`, `audio/AudioEngine.ts` `setFloating`
-2. **5단계 배포** (PLAN 8.3)
+2. **5단계 배포** (PLAN 8.3) — **[docs/deploy-plan.md](deploy-plan.md) 의 "결정할 질문"을 사용자와 정한 뒤 구현** (2026-11-04 계획만 작성, 코드·설정 없음)
    - 도메인 연결 (프론트 도메인 + 백엔드 `wss` 용 하위 도메인)
    - EC2: Docker 이미지 + docker-compose(nginx + backend + redis), Nginx 443 TLS(Let's Encrypt), `/ws` 업그레이드 프록시
    - Vercel: 프론트 배포, `VITE_WS_URL=wss://…` 환경변수
