@@ -1,7 +1,7 @@
 # 진행 현황
 
 > 새 세션은 이 파일부터 읽는다. 작업이 끝나면 갱신하고 같은 커밋에 넣는다.
-> 마지막 갱신: 2026-11-04 (바다 친구들 끝 — 실제 배포(2단계)는 사용자 준비 후. 새 세션은 아래 **"다음 할 일"** 부터)
+> 마지막 갱신: 2026-11-04 밤 (바다 친구들까지 끝, 오늘 작업 마감. **다음 세션은 배포 2단계부터** — 아래 "다음 할 일" 1번)
 
 ## 지난 작업 요약 (2026-11-02 ~ 11-03)
 
@@ -98,7 +98,14 @@
 
 > 새 세션은 여기부터. 1번부터 차례로.
 
-1. **바다 친구들 직접 해 보기** — 기능은 완성·커밋됨. 아래 체크리스트로 해 보고 느낌 피드백이 오면 값만 조정. 값 위치: 마리 수 `world/sea/friends/friendsConfig.ts`, 흩어지는 거리 `DamselSchool.tsx`(3.2m), 문어 숨는 거리 `Cephalopods.tsx`(3.2/4.5m), 거북 빈도 `Turtle.tsx` `nextGap`(4~10분), 돌고래 빈도 `SUMBI_DOLPHIN_MEAN_MS`/`_MIN_MS`/`_MAX_MS`, 돌고래 길·거리 `DolphinSchedule.java` + `dolphinState.ts` `localPass`(둘을 같이)
+1. **배포 2단계 (실제 배포)** ← **다음 세션은 여기부터** — 사용자가 [docs/deploy.md](deploy.md) **"준비할 것"** 0~9 를 끝내면 (11-05 졸업작품 전시회 뒤)
+   - 시작하면 먼저: [docs/deploy.md](deploy.md) 를 처음부터 읽고, 사용자에게 "준비할 것" 0~9 중 어디까지 했는지 물어봄. 막힌 단계가 있으면 그 단계를 같이 진행 (AWS 콘솔·Cloudflare·Vercel 은 사용자가 직접, 값 확인만 도움)
+   - 현재 코드 상태: 배포 1단계(Docker·compose·deploy.sh·cap.sh·GitHub Actions) + 바다 친구들까지 `main` 에 있음, CI 초록. 운영 서버에선 `SUMBI_DEV_EVENTS` 를 넣지 않음 (prod 프로필이 항상 끔). 돌고래 간격은 기본 평균 30분 그대로
+   - 사용자에게 받을 것: 도메인 이름. 그 밖의 값(ARN·인스턴스 ID)은 GitHub Environment 변수에, 비밀(웹훅·인증서·토큰)은 서버에만 — 채팅으로 받지 않음
+   - main push → CI 초록 → **Actions › Deploy** → `https://api.<도메인>/health` · 휴대폰과 PC 같은 바다 · 알림 도착 · Capacity 버튼으로 상한 1 → 대기 화면 → off
+   - 확인 못 한 것: 실제 GitHub Actions(이미지 arm64 빌드·OIDC·SSM), Cloudflare 뒤 WebSocket·진짜 IP, 실제 iPhone
+   - 남은 것: OG 이미지·메타 태그(제목·설명·미리보기 사진), 빌드 청크 나누기(three.js 500KB 경고)
+2. **바다 친구들 직접 해 보기** (배포 전후 아무 때나) — 기능은 완성·커밋됨. 아래 체크리스트로 해 보고 느낌 피드백이 오면 값만 조정. 값 위치: 마리 수 `world/sea/friends/friendsConfig.ts`, 흩어지는 거리 `DamselSchool.tsx`(3.2m), 문어 숨는 거리 `Cephalopods.tsx`(3.2/4.5m), 거북 빈도 `Turtle.tsx` `nextGap`(4~10분), 돌고래 빈도 `SUMBI_DOLPHIN_MEAN_MS`/`_MIN_MS`/`_MAX_MS`, 돌고래 길·거리 `DolphinSchedule.java` + `dolphinState.ts` `localPass`(둘을 같이)
    - [ ] `./dev.sh` → `http://localhost:5173/?event=dolphin` : 들어가고 1.5초 뒤 "돌고래가 지나가요!", 바다 쪽에서 3~6마리가 뛰어오름·물보라·돌고래 소리
    - [ ] 다른 브라우저(또는 휴대폰)로 같은 바다에 들어가 한쪽에서 콘솔 `__sumbi.dolphin()` → 두 화면에 같은 순간
    - [ ] 둥둥(F) 누운 채로 돌고래 쪽을 끌어 둘러보기, 잠수해서 수면 너머 그림자 보기
@@ -106,12 +113,7 @@
    - [ ] `?event=turtle` → 잠수하면 거북이 눈앞을 지나가고 머리 위 "!", 일지에 "바다거북을 만났어요"
    - [ ] 물속: 자리돔 떼에 헤엄쳐 들어가면 흩어짐, 문어 바위에 다가가면 쏙, 게·소라게 숨기, 밤(`?time=night`) 해파리 빛
    - [ ] 휴대폰에서 `?debug=1` 로 물속 fps (전후 비교: `docs/screenshots/sea-friends/fps.md`)
-2. **둥둥·하늘·바다 마무리** — 기능은 완성·커밋됨. 사용자가 직접 해 보고 느낌 피드백(하늘·바다 v2 색감, 블룸 세기 `world/Effects.tsx`, 품질 단계 `lib/quality.ts`, 구도·UI 사라지는 시간 4.5초·갈매기 22~48초/별똥별 45~115초 빈도·물에 잠긴 소리 크기)이 오면 값만 조정. 값 위치: `player/FollowCamera.tsx` `FLOAT_VIEW`, `ui/Hud.tsx` `CALM_AFTER_MS`, `world/sky/Gulls.tsx`·`ShootingStar.tsx` 의 `next`, `audio/AudioEngine.ts` `setFloating`
-3. **배포 2단계 (실제 배포)** — 사용자가 [docs/deploy.md](deploy.md) **"준비할 것"** 0~9 를 끝내면 (11-05 졸업작품 전시회 뒤)
-   - 사용자에게 받을 것: 도메인 이름. 그 밖의 값(ARN·인스턴스 ID)은 GitHub Environment 변수에, 비밀(웹훅·인증서·토큰)은 서버에만 — 채팅으로 받지 않음
-   - main push → CI 초록 → **Actions › Deploy** → `https://api.<도메인>/health` · 휴대폰과 PC 같은 바다 · 알림 도착 · Capacity 버튼으로 상한 1 → 대기 화면 → off
-   - 확인 못 한 것: 실제 GitHub Actions(이미지 arm64 빌드·OIDC·SSM), Cloudflare 뒤 WebSocket·진짜 IP, 실제 iPhone
-   - 남은 것: OG 이미지·메타 태그(제목·설명·미리보기 사진), 빌드 청크 나누기(three.js 500KB 경고)
+3. **둥둥·하늘·바다 마무리** — 기능은 완성·커밋됨. 사용자가 직접 해 보고 느낌 피드백(하늘·바다 v2 색감, 블룸 세기 `world/Effects.tsx`, 품질 단계 `lib/quality.ts`, 구도·UI 사라지는 시간 4.5초·갈매기 22~48초/별똥별 45~115초 빈도·물에 잠긴 소리 크기)이 오면 값만 조정. 값 위치: `player/FollowCamera.tsx` `FLOAT_VIEW`, `ui/Hud.tsx` `CALM_AFTER_MS`, `world/sky/Gulls.tsx`·`ShootingStar.tsx` 의 `next`, `audio/AudioEngine.ts` `setFloating`
 4. **배포 서버 k6 부하 테스트** (가짜 WebSocket 해녀 50~200명) → 상한(처음 20)을 얼마까지 올릴지, 방 인원, t4g.small CPU·메모리 확인. 상한은 `cap.sh` 로 재시작 없이 올림
 5. 나중에 할 것
    - 📷 **사진 모드** (정면 구도 — 되돌린 불턱 정면 시점을 여기서 다시 설계)
