@@ -1,0 +1,15 @@
+# 운영 설정 (Docker 이미지에서 SPRING_PROFILES_ACTIVE=prod). 비밀 값은 서버 deploy/.env 에만.
+sumbi:
+  # 운영 프론트 주소가 꼭 있어야 함 (없으면 서버가 뜨지 않음 → 잘못된 설정으로 열린 채 배포되는 걸 막음)
+  allowed-origins: ${SUMBI_ALLOWED_ORIGINS}
+  # 처음 상한 20명. 운영 중엔 Redis 키로 바꿈 (docs/deploy.md "동시접속 상한")
+  max-total: ${SUMBI_MAX_TOTAL:20}
+
+server:
+  # nginx 가 붙여 주는 X-Forwarded-* 를 믿음 (nginx 뒤에서만 접근 가능)
+  forward-headers-strategy: native
+
+logging:
+  level:
+    root: INFO
+    com.sumbi: INFO

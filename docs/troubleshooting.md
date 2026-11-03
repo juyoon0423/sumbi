@@ -309,3 +309,35 @@
 - 겹침 검사는 그 순간 보이는 것만 봄: 잠수 중에만 나오는 숨 게이지가 조이스틱·잠수 버튼과 겹쳤던 걸 놓쳤음 → 잠수 중에도 한 번 더 검사(`.breath:not(.hidden)` 포함).
 - 두 손가락 줌: 캔버스 위 손가락이 둘이면 둘러보기를 멈추고 두 손가락 거리 비율로 `cameraRig.distance`(둥둥은 `floatCam.fov`)를 곱함. 한 손가락을 떼면 남은 손가락의 지금 자리부터 둘러보기를 이어서 시점이 튀지 않게.
 
+
+## 배포 1단계: Docker·대기열·무중단 배포 (2026-11-04)
+
+### Docker 이미지에서 서버가 안 뜸: `No implementation of the random number generator algorithm "L32X64MixRandom"`
+- **원인**: `RandomGenerator.getDefault()` 는 `jdk.random` 모듈에서 구현을 찾는데 `eclipse-temurin:21-jre` 이미지에는 그 모듈이 없음 (JDK 에선 되므로 테스트·`dev.sh` 로는 안 보임).
+- **해결**: 서버 코드는 `ThreadLocalRandom.current()` (java.base, 여러 스레드에서 써도 됨). 확인: `docker run --rm eclipse-temurin:21-jre java --list-modules | grep random` 이 비어 있음.
+- deploy.sh 는 이때 새 서버 건강 확인에서 실패 → nginx 를 바꾸지 않고 이전 서버를 그대로 둠 (실제로 그렇게 동작함을 확인).
+
+### 로컬 덮어쓰기에서 `env file backend.env not found`
+- `docker-compose.local.yml` 에서 `env_file: !reset []` 로 지우려 했지만 YAML 앵커(`<<: *backend`)로 합친 값엔 적용되지 않음 → 운영 파일에서 `env_file: [{ path: backend.env, required: false }]`, 운영에서 있는지는 `deploy.sh` 가 확인.
+
+### nginx 설정 파일 하나만 마운트하면 바꿔도 안 바뀜
+- 파일을 새로 써서 바꾸면(아이노드가 바뀜) 파일 단위 bind mount 는 옛 파일을 계속 봄 → 바뀌는 `upstream.conf` 는 **폴더**(`data/nginx`)째 마운트.
+
+### blue/green 전환 확인에서 "다시 online" 이 가끔 실패 (테스트 문제)
+- 상태 기록은 50ms 마다인데 기다리는 조건은 지금 상태(`netStatus === 'online'`)를 바로 봐서, 기록이 따라오기 전에 끝남 → 조건도 기록(`restarting` 뒤에 `online` 이 있는지)으로.
+
+### `cap.sh off` 직후 값이 그대로
+- 서버가 5초마다 Redis 를 읽으므로 바로 다시 보면 이전 값. `cap.sh` 는 바꾼 뒤 6초 기다렸다가 보여 줌.
+
+### 대기열 테스트가 9~11명만 들어감 (`ConcurrentJoinLeaveTest`)
+- 자리가 나면 자동 입장이 아니라 **제안(`slot`) → `enter`** 로 바뀌어서. 가짜 클라이언트가 `slot` 을 받으면 바로 `enter` 를 보내게 함.
+
+### 알림 테스트에서 받은 요청이 0개 (`WebhookAlertsTest`)
+- `HttpClient` 에 테스트용 실행기를 넘겼더니 테스트가 실행기를 닫아 응답 처리가 멈춤 → `HttpClient` 는 기본 실행기, 보내기만 넘겨받은 실행기에서. 테스트는 받은 요청을 잠깐 기다리며 확인.
+
+### 개발용 fps 표시(`?debug=1`)를 내렸더니 휴대폰 겹침 검사 실패
+- 98px 로 내리면 잠수 중 숨 게이지·가로 화면 행동 바와 겹침 → 60px 그대로. 대기 순번(오른쪽 위)과는 개발 모드 `?debug=1` 일 때만 겹칠 수 있음 (운영엔 없음).
+
+### 운영 설정이 빠졌는데 서버가 그냥 뜸 (`SUMBI_ALLOWED_ORIGINS`)
+- **원인**: Spring Boot 는 못 찾은 환경변수 `${SUMBI_ALLOWED_ORIGINS}` 를 오류 없이 **글자 그대로** 넣음 → 아무 origin 도 맞지 않아 모두가 혼자 하는 바다로 떨어지는데 서버는 건강해 보임.
+- **해결**: `SumbiProperties` 가 비었거나 `${`·`<도메인>` 이 남은 값이면 시작을 멈춤 (`SumbiPropertiesTest`). deploy.sh 건강 확인에서 걸려 이전 서버가 그대로 남음.

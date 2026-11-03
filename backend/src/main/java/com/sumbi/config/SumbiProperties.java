@@ -36,6 +36,21 @@ public record SumbiProperties(
     Bulteok bulteok,
     Sea sea) {
 
+    /**
+     * 허용 origin 이 비었거나 채우지 않은 자리(`${SUMBI_ALLOWED_ORIGINS}` 그대로, `<도메인>`)면 서버가 뜨지 않게.
+     * (Spring 은 못 찾은 환경변수를 글자 그대로 넣어서, 운영 설정이 빠져도 조용히 뜸)
+     */
+    public SumbiProperties {
+        if (allowedOrigins == null || allowedOrigins.isEmpty()) {
+            throw new IllegalArgumentException("SUMBI_ALLOWED_ORIGINS 가 비었어요 (프론트 주소, 쉼표로 여러 개)");
+        }
+        for (String o : allowedOrigins) {
+            if (o == null || o.isBlank() || o.contains("${") || o.contains("<") || o.contains(">")) {
+                throw new IllegalArgumentException("SUMBI_ALLOWED_ORIGINS 를 채워 주세요: '" + o + "'");
+            }
+        }
+    }
+
     /** 손질 모션 길이(ms, 프론트와 같게), 귤 까먹기 길이, 첫 대야 크기, 가득 찬 대야 축하 시간 */
     public record Bulteok(long prepMs, long restMs, int basinCapacity, long basinCelebrateMs) {}
 

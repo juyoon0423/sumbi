@@ -21,6 +21,8 @@ cd frontend && npm run build && npm run lint  # 타입 검사 + 빌드, oxlint
 - 개발용: `/dev/character` (캐릭터 랩), 브라우저 콘솔 `window.__sumbi` (플레이어·카메라·해산물·원격 해녀·게임 스토어·불턱·`setTime('night')`·`float.start()`·`gulls()`·`shootingStar()`), 시간대 고정 `?time=dawn|day|sunset|night` 또는 `?hour=5.6`, `?quality=high|medium|low`, `?debug=1` (fps·품질 표시)
 - 휴대폰 확인: 같은 와이파이에서 `./dev.sh` 가 찍어 주는 `http://<내부 IP>:5173/?debug=1`
 - 백엔드를 끄고 켤 때 `lsof -ti tcp:8080 -sTCP:LISTEN` 으로 서버 프로세스만 고를 것 (그냥 `tcp:8080` 은 연결된 브라우저까지 잡음)
+- **배포**: [docs/deploy.md](docs/deploy.md). 운영 구성 로컬 확인은 `cd deploy && ./local.sh up` (Docker Desktop, http://localhost:8090) → 프론트는 `VITE_WS_URL=ws://localhost:8090/ws npx vite --port 5174`, 끝나면 `./local.sh down`. 동시접속 상한: `./local.sh cap 5` (운영 `deploy/cap.sh`)
+- 비밀(웹훅·인증서·토큰)은 서버 `deploy/backend.env`·`deploy/data/` 에만. 저장소·채팅에 남기지 않음
 
 ## 작업 규칙
 
@@ -30,6 +32,8 @@ cd frontend && npm run build && npm run lint  # 타입 검사 + 빌드, oxlint
   - 불턱 자리 옮기기: `capture-bulteok-seat.mjs <폴더> [원본프레임폴더]` (백엔드 필요, 가짜 WebSocket 해녀로 24자리를 채움)
   - 휴대폰 조작: `capture-mobile.mjs <폴더>` (실제 터치 이벤트로 조이스틱·둘러보기·잠수 버튼·두 손가락, HUD 겹침 검사, 세로·가로·데스크톱)
   - 둥둥: `capture-dungdung.mjs <폴더>` (백엔드 필요, 눕기·하늘·일어나기·다른 창·시간대 4개·별똥별·일지·모바일)
+  - 대기열: `capture-queue.mjs <폴더>` (백엔드·Redis 필요, Redis 로 상한을 바꿔 대기·자리 카드·입장·상한 올리기. `SUMBI_URL`·`SUMBI_API`·`SUMBI_REDIS_CLI` 로 Docker 구성에도)
+  - 무중단 배포: `capture-deploy-switch.mjs <폴더>` (`deploy/local.sh up` + 5174 프론트, 접속한 채 blue↔green → 1012 → 다시 접속)
   - 설치된 Chrome을 씀 (`channel: 'chrome'`). 확정 캡처는 `docs/screenshots/<주제>/`에 JPEG로 저장 (용량 줄이기).
 - **단계(또는 의미 있는 작업)가 끝날 때마다**: 비밀 정보 점검(API 키·비밀번호·토큰·`.env`·키 파일) → 의미 있는 단위로 커밋 → `main`에 push.
 - **작업이 끝날 때마다 `docs/progress.md`와 `docs/troubleshooting.md`를 갱신하고, 그 변경도 같은 커밋에 포함**한다.

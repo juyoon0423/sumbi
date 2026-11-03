@@ -4,6 +4,7 @@ import com.sumbi.protocol.LookInfo;
 import com.sumbi.protocol.NickParts;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.random.RandomGenerator;
 import org.springframework.stereotype.Component;
 
@@ -37,7 +38,8 @@ public class CustomizeCatalog {
     private final RandomGenerator random;
 
     public CustomizeCatalog() {
-        this(RandomGenerator.getDefault());
+        // RandomGenerator.getDefault() 는 jdk.random 모듈이 필요한데 JRE 이미지엔 없음 → java.base 의 ThreadLocalRandom
+        this(ThreadLocalRandom.current());
     }
 
     public CustomizeCatalog(RandomGenerator random) {

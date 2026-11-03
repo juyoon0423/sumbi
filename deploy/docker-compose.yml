@@ -1,0 +1,60 @@
+# 숨비 운영 구성 (EC2 t4g.small 한 대): nginx → backend-blue / backend-green (번갈아 배포) → redis
+# 직접 docker compose up 하지 말고 ./deploy.sh <이미지 태그> 로 배포 (docs/deploy.md)
+# .env (deploy.sh 가 관리): SUMBI_IMAGE, BLUE_TAG, GREEN_TAG, ACTIVE
+# backend.env (직접 만듦, 비밀): 서버 설정·알림 웹훅
+
+name: sumbi
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-backend: &backend
+  # 운영에선 꼭 있어야 함 (deploy.sh 가 확인). 로컬 확인용은 없이 environment 로
+  env_file:
+    - path: backend.env
+      required: false
+  environment:
+    SUMBI_REDIS_URL: redis://redis:6379
+    SUMBI_STATS_STORE: auto
+  depends_on:
+    - redis
+  restart: unless-stopped
+  # docker stop → SIGTERM → 접속자에게 1012(재시작) 신호를 보내고 정리할 시간
+  stop_grace_period: 20s
+  mem_limit: 700m
+  logging: *logging
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "443:443"
+    volumes:
+      - ./nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx:/etc/nginx/sumbi:ro
+      - ./data/nginx:/etc/nginx/sumbi-active:ro
+      - ./data/certs:/etc/nginx/certs:ro
+    restart: unless-stopped
+    mem_limit: 64m
+    logging: *logging
+
+  backend-blue:
+    <<: *backend
+    image: ${SUMBI_IMAGE:-ghcr.io/juyoon0423/sumbi-backend}:${BLUE_TAG:-main}
+
+  backend-green:
+    <<: *backend
+    image: ${SUMBI_IMAGE:-ghcr.io/juyoon0423/sumbi-backend}:${GREEN_TAG:-main}
+
+  redis:
+    image: redis:7.4-alpine
+    # 오늘의 바다 집계·동시접속 상한 값. 디스크에 저장해 재시작해도 남음
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "64mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - ./data/redis:/data
+    restart: unless-stopped
+    mem_limit: 128m
+    logging: *logging
