@@ -149,7 +149,9 @@ if (import.meta.env.DEV) {
     import('../world/sky/ShootingStar'),
     import('../player/FollowCamera'),
     import('../lib/quality'),
-  ]).then(([rt, sf, inp, rm, bt, zone, time, session, layout, float, gulls, star, fcam, quality]) => {
+    import('../world/sea/friends/Cephalopods'),
+    import('../world/sea/friends/SeaFriends'),
+  ]).then(([rt, sf, inp, rm, bt, zone, time, session, layout, float, gulls, star, fcam, quality, ceph, friends]) => {
     ;(window as unknown as Record<string, unknown>).__sumbi = {
       player: rt.player,
       cameraRig: rt.cameraRig,
@@ -169,7 +171,7 @@ if (import.meta.env.DEV) {
         const cam = rt.view.camera
         if (!cam) return null
         const v = cam.position.clone().set(x, y, z).project(cam)
-        return { x: ((v.x + 1) / 2) * window.innerWidth, y: ((1 - v.y) / 2) * window.innerHeight }
+        return { x: ((v.x + 1) / 2) * window.innerWidth, y: ((1 - v.y) / 2) * window.innerHeight, behind: v.z > 1 }
       },
       net,
       /** 시간대 고정: setTime('night') · setTime(21.5) · setTime(null) = 실제 한국 시간 */
@@ -177,10 +179,12 @@ if (import.meta.env.DEV) {
       env: time.env,
       session: session.useSession,
       /** 둥둥: float.start() · float.stop() · float.cam (둘러보기 각도) */
-      float: { start: float.startFloat, stop: float.stopFloat, toggle: float.toggleFloat, cam: float.floatCam, view: fcam.FLOAT_VIEW },
+      float: { start: float.startFloat, stop: float.stopFloat, toggle: float.toggleFloat, cam: float.floatCam, state: float.floatState, view: fcam.FLOAT_VIEW },
       /** 하늘: 갈매기 바로 날리기 · 별똥별 바로 떨어뜨리기 */
       gulls: () => gulls.gullControl.spawn(),
       shootingStar: () => star.shootingStarControl.fire(),
+      /** 바다 친구들: octopus.peekNow() · 자리 확인 */
+      friends: { octopus: ceph.octopusDebug, schools: friends.schoolSpots, where: friends.friendsDebug },
     }
   })
 }
