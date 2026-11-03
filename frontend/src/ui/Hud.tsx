@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import { touchUI } from '../lib/device'
 import { CONFIG, ITEM_LABEL, withObjectParticle, type ItemType } from '../config'
 import { net } from '../net'
 import { lookInfo, nickParts } from '../net/hello'
 import { useCustomize } from '../store/customizeStore'
 import { CustomizeFields, CustomizeSheet, RandomAllButton } from './CustomizePanel'
 import { JournalButton, JournalOverlay } from './JournalCard'
+import { Joystick } from './Joystick'
 import { startAct } from '../haenyeo/acts'
 import { stopFloat, toggleFloat } from '../player/float'
 import { input } from '../player/input'
@@ -28,7 +30,15 @@ function HintPill() {
   }, [])
   return (
     <div className={`pill hint ${show ? '' : 'hidden'}`}>
-      WASD·방향키로 헤엄치고, <b>Space</b>를 누르고 있으면 잠수해요 · 마우스로 끌어 둘러봐요
+      {touchUI ? (
+        <>
+          왼쪽 아래를 끌어 헤엄치고, <b>🤿</b>를 누르고 있으면 잠수해요 · 화면을 끌어 둘러봐요
+        </>
+      ) : (
+        <>
+          WASD·방향키로 헤엄치고, <b>Space</b>를 누르고 있으면 잠수해요 · 마우스로 끌어 둘러봐요
+        </>
+      )}
     </div>
   )
 }
@@ -84,7 +94,13 @@ function Basket() {
 /** 왼쪽 아래: 오늘의 바다 (접을 수 있는 카드, 레퍼런스 순례길) */
 function TodaySea() {
   const today = useGame((s) => s.today)
-  const [open, setOpen] = useState(true)
+  // 휴대폰은 화면이 좁아 접은 채로 시작 (눌러서 펼침)
+  const [open, setOpen] = useState(!touchUI)
+  // 휴대폰: 펼치면 위쪽 안내·알림 문구를 그만큼 아래로 (CSS body.today-open)
+  useEffect(() => {
+    document.body.classList.toggle('today-open', open)
+    return () => document.body.classList.remove('today-open')
+  }, [open])
   if (!today) return null
   const { divers, items } = today
   return (
@@ -510,7 +526,29 @@ function QueueOverlay() {
   )
 }
 
+/** 스크롤·슬라이더가 필요한 곳 (여기선 손가락 끌기를 브라우저에 맡김) */
+const NATIVE_SCROLL = '.cz-sheet, .journal-overlay, .volume-panel, input'
+
+/** 휴대폰: 게임 화면 어디서 끌어도 페이지가 스크롤·확대되지 않게 (iOS 는 끌기를 가져가면 조작이 끊김) */
+function useBlockPageScroll() {
+  useEffect(() => {
+    if (!touchUI) return
+    const stop = (e: TouchEvent) => {
+      if ((e.target as Element | null)?.closest?.(NATIVE_SCROLL)) return
+      if (e.cancelable) e.preventDefault()
+    }
+    const pinch = (e: Event) => e.preventDefault()
+    document.addEventListener('touchmove', stop, { passive: false })
+    document.addEventListener('gesturestart', pinch)
+    return () => {
+      document.removeEventListener('touchmove', stop)
+      document.removeEventListener('gesturestart', pinch)
+    }
+  }, [])
+}
+
 export function Hud() {
+  useBlockPageScroll()
   const under = useGame((s) => s.cameraUnderwater)
   const customizing = useGame((s) => s.customizing)
   const inBulteok = useBulteok((s) => s.zone === 'bulteok')
@@ -518,7 +556,8 @@ export function Hud() {
   const calm = useFloat((s) => s.calm)
   if (customizing) return <div className="hud"><SeaCustomize /></div>
   return (
-    <div className={`hud ${floating ? 'floating' : ''} ${calm ? 'calm' : ''}`}>
+    <div className={`hud ${touchUI ? 'touch' : ''} ${inBulteok ? 'in-bulteok' : ''} ${floating ? 'floating' : ''} ${calm ? 'calm' : ''}`}>
+      {touchUI && !inBulteok && <Joystick />}
       {!inBulteok && <FloatCalm />}
       <div className={`vignette ${under ? 'on' : ''}`} />
       <ZoneFade />
@@ -531,26 +570,37 @@ export function Hud() {
       </div>
       <div className="top-left">
         <Basket />
+        {/* 휴대폰: 아래쪽은 조이스틱·버튼 자리라 카드를 망사리 밑으로 (불턱에선 공동 대야만) */}
+        {touchUI && inBulteok && <BasinCard />}
+        {touchUI && !inBulteok && <TodaySea />}
       </div>
       <div className="top-right">
         <JournalButton />
         <CustomizeButton />
         <VolumePanel />
       </div>
-      <div className="bottom-left">
-        {inBulteok && <BasinCard />}
-        <TodaySea />
-      </div>
+      {!touchUI && (
+        <div className="bottom-left">
+          {inBulteok && <BasinCard />}
+          <TodaySea />
+        </div>
+      )}
       <div className="bottom-center">
         {inBulteok ? (
           <BulteokBar />
         ) : (
           <>
             {!floating && <BreathGauge />}
-            <ActionBar />
+            {!touchUI && <ActionBar />}
           </>
         )}
       </div>
+      {/* 휴대폰: 행동 버튼은 오른쪽 아래 세로로 (잠수가 엄지 가까이 맨 아래) */}
+      {touchUI && !inBulteok && (
+        <div className="bottom-right">
+          <ActionBar />
+        </div>
+      )}
     </div>
   )
 }

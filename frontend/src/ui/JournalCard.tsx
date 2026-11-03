@@ -14,11 +14,13 @@ export function JournalButton() {
   return (
     <button
       className="glass journal-btn"
+      aria-label="물질 마치기"
       onClick={() => void openJournal()}
       disabled={diving}
       title={diving ? '수면에서 마칠 수 있어요' : '오늘 물질을 마치고 일지를 봐요'}
     >
-      📔 물질 마치기
+      <span>📔</span>
+      <span className="journal-label">물질 마치기</span>
     </button>
   )
 }

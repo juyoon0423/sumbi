@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { touchUI } from '../lib/device'
 import { QUALITY, useQuality } from '../lib/quality'
 
 // 개발용 표시: 화면 오른쪽 가장자리에 fps·품질 단계. 개발 서버에서 ?debug=1 일 때만 (배포 빌드엔 아예 안 들어감).
@@ -44,7 +45,8 @@ export function DebugOverlay() {
         position: 'fixed',
         // 위쪽 안내 문구 아래, 이름표보다 위 (오른쪽)
         right: 'calc(env(safe-area-inset-right, 0px) + 6px)',
-        top: '17%',
+        // 휴대폰은 오른쪽 위 둥근 버튼 바로 아래 (안내 문구·카드와 안 겹치게)
+        top: touchUI ? 'calc(env(safe-area-inset-top, 0px) + 60px)' : '17%',
         textAlign: 'right',
         zIndex: 1000,
         pointerEvents: 'none',

@@ -29,6 +29,9 @@ body,
   -webkit-font-smoothing: antialiased;
   user-select: none;
   -webkit-user-select: none;
+  /* 휴대폰에서 끌 때 페이지가 튕기거나(바운스) 당겨서 새로고침되지 않게 */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button {
@@ -1144,4 +1147,196 @@ body.float-calm .tag-stack {
   opacity: 0;
   transition: opacity 1.2s ease;
   filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.25));
+}
+
+/* ── 터치 화면 (휴대폰·태블릿): 왼쪽 아래 조이스틱, 오른쪽 아래 세로 버튼, 카드는 위로 ── */
+.hud.touch {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.hud.touch kbd {
+  display: none;
+}
+.hud.touch .top-left {
+  top: calc(12px + env(safe-area-inset-top));
+  left: calc(12px + env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: calc(100vw - 24px - 150px);
+}
+.hud.touch .top-right {
+  top: calc(12px + env(safe-area-inset-top));
+  right: calc(12px + env(safe-area-inset-right));
+  gap: 6px;
+}
+.hud.touch .round,
+.hud.touch .journal-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font-size: 17px;
+}
+.hud.touch .journal-btn {
+  border-radius: 50%;
+}
+.hud.touch .journal-label {
+  display: none;
+}
+.hud.touch .basket {
+  padding: 8px 12px 9px;
+}
+.hud.touch .basket-items {
+  gap: 9px;
+  font-size: 12.5px;
+}
+.hud.touch .today,
+.hud.touch .basin-card {
+  margin: 0;
+  padding: 7px 12px 8px;
+  max-width: 100%;
+}
+.hud.touch .today-body {
+  font-size: 12.5px;
+}
+/* 안내·알림 문구는 왼쪽 위 카드들 아래 */
+.hud.touch .top-center {
+  top: calc(150px + env(safe-area-inset-top));
+  width: calc(100% - 24px);
+}
+body.today-open .hud.touch .top-center {
+  top: calc(178px + env(safe-area-inset-top));
+}
+.hud.touch.in-bulteok .top-center {
+  top: calc(172px + env(safe-area-inset-top));
+}
+.hud.touch .hint {
+  white-space: normal;
+  text-align: center;
+  font-size: 12.5px;
+}
+.hud.touch .bottom-center {
+  bottom: calc(14px + env(safe-area-inset-bottom));
+}
+/* 오른쪽 아래 세로 행동 버튼 (잠수가 맨 아래, 엄지 가까이) */
+.bottom-right {
+  position: absolute;
+  right: calc(12px + env(safe-area-inset-right));
+  bottom: calc(16px + env(safe-area-inset-bottom));
+}
+.hud.touch .bottom-right .actionbar {
+  flex-direction: column-reverse;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 34px;
+}
+.hud.touch .bottom-right .action {
+  min-width: 0;
+  width: 60px;
+  height: 60px;
+  padding: 0;
+  justify-content: center;
+  font-size: 11.5px;
+}
+.hud.touch .bottom-right .action .icon {
+  font-size: 20px;
+}
+/* 잠수 버튼은 더 크게 */
+.hud.touch .bottom-right .action:first-child {
+  width: 72px;
+  height: 72px;
+  background: rgba(142, 232, 245, 0.16);
+}
+.hud.touch .bottom-right .action:first-child.active {
+  background: rgba(142, 232, 245, 0.4);
+}
+.hud.touch .float-wake {
+  bottom: calc(24px + env(safe-area-inset-bottom));
+}
+/* 불턱 아래 패널: 좁은 화면 폭에 맞춤 */
+.hud.touch .bulteok-bar {
+  width: calc(100vw - 24px);
+}
+.hud.touch .bulteok-bar .actionbar {
+  justify-content: space-around;
+  align-self: stretch;
+}
+.hud.touch .bulteok-bar .action {
+  min-width: 0;
+  flex: 1;
+  padding: 6px 4px;
+}
+.hud.touch .prep-panel {
+  align-self: stretch;
+}
+.hud.touch .prep-items {
+  justify-content: space-between;
+}
+.hud.touch .prep {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 8px;
+}
+
+/* 조이스틱: 왼쪽 아래 영역 어디든 엄지를 대면 그 자리에 생김 */
+.joy-zone {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 58vw;
+  height: 42vh;
+  pointer-events: auto;
+  touch-action: none;
+}
+.joy-base {
+  position: absolute;
+  left: calc(84px + env(safe-area-inset-left));
+  top: calc(100% - 96px - env(safe-area-inset-bottom));
+  width: 112px;
+  height: 112px;
+  margin: -56px 0 0 -56px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  background: rgba(20, 40, 56, 0.22);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  opacity: 0.55;
+  transition: opacity 0.25s;
+  pointer-events: none;
+}
+.joy-base.on {
+  opacity: 1;
+  transition: none;
+}
+.joy-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 50px;
+  height: 50px;
+  margin: -25px 0 0 -25px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
+}
+.joy-base:not(.on) .joy-knob {
+  transition: transform 0.18s ease-out;
+}
+/* 가로 휴대폰: 높이가 낮아 안내·알림 문구는 맨 위 가운데 (망사리와 둥근 버튼 사이) */
+@media (orientation: landscape) {
+  .hud.touch .top-center,
+  body.today-open .hud.touch .top-center,
+  .hud.touch.in-bulteok .top-center {
+    top: calc(12px + env(safe-area-inset-top));
+    width: max-content;
+    max-width: calc(100vw - 520px);
+  }
+  .hud.touch .hint {
+    font-size: 12px;
+  }
+  .hud.touch .joy-zone {
+    height: 60vh;
+  }
 }

@@ -28,6 +28,7 @@ cd frontend && npm run build && npm run lint  # 타입 검사 + 빌드, oxlint
   - `npm run capture` (게임·캐릭터 랩) · `node scripts/capture-dive.mjs <폴더>` (잠수 연속) · `node scripts/capture-customize.mjs <폴더>` (꾸미기) · `node scripts/capture-multiplayer.mjs <폴더>` (브라우저 3개 멀티플레이, 백엔드 필요)
   - 4단계: `capture-bulteok.mjs` (불턱 손질·대야, 백엔드를 `SUMBI_BASIN_CAPACITY=6` 으로) · `capture-time.mjs` (시간대, 백엔드 없어도 됨) · `capture-journal.mjs` (물질 일지)
   - 불턱 자리 옮기기: `capture-bulteok-seat.mjs <폴더> [원본프레임폴더]` (백엔드 필요, 가짜 WebSocket 해녀로 24자리를 채움)
+  - 휴대폰 조작: `capture-mobile.mjs <폴더>` (실제 터치 이벤트로 조이스틱·둘러보기·잠수 버튼·두 손가락, HUD 겹침 검사, 세로·가로·데스크톱)
   - 둥둥: `capture-dungdung.mjs <폴더>` (백엔드 필요, 눕기·하늘·일어나기·다른 창·시간대 4개·별똥별·일지·모바일)
   - 설치된 Chrome을 씀 (`channel: 'chrome'`). 확정 캡처는 `docs/screenshots/<주제>/`에 JPEG로 저장 (용량 줄이기).
 - **단계(또는 의미 있는 작업)가 끝날 때마다**: 비밀 정보 점검(API 키·비밀번호·토큰·`.env`·키 파일) → 의미 있는 단위로 커밋 → `main`에 push.

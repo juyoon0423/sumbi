@@ -7,6 +7,7 @@ import { useGame } from '../store/gameStore'
 import { terrainY } from '../world/terrain'
 import { waveHeight } from '../world/sea/waves'
 import { useFloat } from '../store/floatStore'
+import { blockNativeTouch } from '../lib/device'
 import { floatCam } from './float'
 import { cameraRig, player, showcaseView, view } from './runtime'
 
@@ -42,6 +43,7 @@ export function FollowCamera() {
   useEffect(() => {
     const el = gl.domElement
     el.style.touchAction = 'none'
+    const unblock = blockNativeTouch(el)
     const down = (e: PointerEvent) => {
       drag.current = { x: e.clientX, y: e.clientY, id: e.pointerId }
       el.setPointerCapture(e.pointerId)
@@ -81,6 +83,7 @@ export function FollowCamera() {
     el.addEventListener('pointercancel', up)
     el.addEventListener('wheel', wheel, { passive: true })
     return () => {
+      unblock()
       el.removeEventListener('pointerdown', down)
       el.removeEventListener('pointermove', move)
       el.removeEventListener('pointerup', up)

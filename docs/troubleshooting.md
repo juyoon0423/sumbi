@@ -298,3 +298,12 @@
 ### 페이지는 열리는데 혼자 하는 바다로 바뀜
 - WebSocket 주소는 개발 모드에서 `location.hostname` 을 따라가므로 IP 로 열면 `ws://<IP>:8080/ws`. 서버가 origin `http://<IP>:5173` 을 거절하면(403) 연결 실패 → `dev.sh` 로 켰는지(허용 origin 에 내부 IP 추가), 와이파이가 바뀌어 IP 가 달라졌으면 서버를 다시 켬. 확인: `curl -H "Origin: http://<IP>:5173" -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" http://<IP>:8080/ws` → 101 이면 허용.
 
+### 휴대폰(iPhone)에서 화면을 끌어도 시점이 안 돌아감
+- **원인(추정)**: iOS WebKit 은 손가락 끌기를 페이지 스크롤·바운스로 가져가며 `pointercancel` 을 보냄 → 카메라 끌기가 바로 끝남. Chrome 터치 흉내에선 재현되지 않음 (`touch-action: none` 만으로 충분).
+- **해결**: 캔버스·조이스틱·문서 전체에 `touchmove` 를 `{ passive: false }` 로 막고(`lib/device.ts` `blockNativeTouch`, `Hud` `useBlockPageScroll`), iOS 두 손가락 `gesturestart` 도 막음. `overscroll-behavior: none`, viewport `maximum-scale=1, user-scalable=no, viewport-fit=cover`.
+- `touchstart` 는 막지 않음: 막으면 탭 뒤 `click` 이 안 와서 R3F `onClick`(불턱 빈자리)이 안 됨.
+
+### 휴대폰 HUD 가 겹침
+- 데스크톱 배치(아래 가운데 행동 바 + 왼쪽 아래 카드)를 좁은 화면에 그대로 쓰면 오늘의 바다·행동 바·손질 패널이 겹침. 터치 화면은 `.hud.touch` 로 따로 배치하고, `capture-mobile.mjs` 가 보이는 HUD 상자끼리 겹치는지·화면 밖인지 검사.
+- 버튼 글자를 CSS 로 숨기면 접근 이름도 사라짐(`getByRole(name)` 실패) → `aria-label` 을 둠 (📔 물질 마치기).
+
