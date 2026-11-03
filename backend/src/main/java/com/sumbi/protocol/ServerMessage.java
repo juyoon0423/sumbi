@@ -22,6 +22,7 @@ import java.util.Map;
     @JsonSubTypes.Type(value = ServerMessage.Basin.class, name = "basin"),
     @JsonSubTypes.Type(value = ServerMessage.SeatMove.class, name = "seat"),
     @JsonSubTypes.Type(value = ServerMessage.SeatDenied.class, name = "seat_no"),
+    @JsonSubTypes.Type(value = ServerMessage.Dolphin.class, name = "dolphin"),
     @JsonSubTypes.Type(value = ServerMessage.Pong.class, name = "pong"),
     @JsonSubTypes.Type(value = ServerMessage.Err.class, name = "err"),
 })
@@ -51,11 +52,19 @@ public sealed interface ServerMessage {
 
     record Evt(int id, String a, String item) implements ServerMessage {}
 
-    record Today(int divers, Map<String, Integer> items) implements ServerMessage {
+    /** dolphins: 오늘 (모든 바다에서) 돌고래가 나타난 횟수 */
+    record Today(int divers, Map<String, Integer> items, int dolphins) implements ServerMessage {
         public static Today of(TodayStats s) {
-            return new Today(s.divers(), s.items());
+            return new Today(s.divers(), s.items(), s.dolphins());
         }
     }
+
+    /**
+     * 남방큰돌고래 무리가 지나감 (같은 바다의 모두에게, 늦게 들어온 사람에겐 입장 직후).
+     * el: 시작한 지 지난 시간(ms) → 각 화면이 자기 시계로 시작 시각을 맞춤 (서버·브라우저 시계가 달라도 같은 장면).
+     * dur: 지나가는 시간(ms), from/to: [x, z], n: 마리 수, seed: 뛰어오르는 박자·높이
+     */
+    record Dolphin(int seq, long el, long dur, double[] from, double[] to, int n, int seed) implements ServerMessage {}
 
     /**
      * 누군가 구역을 옮김 (본인 포함). 불턱이면 seat, 바다면 p(다시 들어갈 자리).

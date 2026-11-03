@@ -160,6 +160,26 @@ class AudioEngine {
     synth.gull(this.ctx, p, v)
   }
 
+  /** 멀리서 돌고래 (pan -1~1, v: 거리로 정한 크기) */
+  playDolphin(pan = 0, v = 1) {
+    if (!this.ctx) return
+    const p = this.ctx.createStereoPanner()
+    p.pan.value = pan
+    p.connect(this.far)
+    synth.dolphin(this.ctx, this.noise, p, v)
+  }
+
+  /** 멀리서 물보라 (돌고래가 뛰어오르고 들어갈 때) */
+  playSplashAt(pan = 0, v = 1) {
+    if (!this.ctx) return
+    const p = this.ctx.createStereoPanner()
+    p.pan.value = pan
+    const g = this.ctx.createGain()
+    g.gain.value = Math.min(1, v)
+    p.connect(g).connect(this.far)
+    synth.splash(this.ctx, this.noise, p)
+  }
+
   // ── 숨비소리 ──
   playSumbi({ distance = 0, pan = 0, pitch = 1 }: SumbiOptions = {}) {
     const ctx = this.ctx

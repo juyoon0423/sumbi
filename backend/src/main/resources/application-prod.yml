@@ -4,6 +4,9 @@ sumbi:
   allowed-origins: ${SUMBI_ALLOWED_ORIGINS}
   # 처음 상한 20명. 운영 중엔 Redis 키로 바꿈 (docs/deploy.md "동시접속 상한")
   max-total: ${SUMBI_MAX_TOTAL:20}
+  # 개발용 바로 부르기는 운영에서 항상 끔 (환경변수로도 못 켬)
+  sea-friends:
+    dev-events: false
 
 server:
   # nginx 가 붙여 주는 X-Forwarded-* 를 믿음 (nginx 뒤에서만 접근 가능)

@@ -15,6 +15,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
     @JsonSubTypes.Type(value = ClientMessage.Seat.class, name = "seat"),
     @JsonSubTypes.Type(value = ClientMessage.Ping.class, name = "ping"),
     @JsonSubTypes.Type(value = ClientMessage.Enter.class, name = "enter"),
+    @JsonSubTypes.Type(value = ClientMessage.Dev.class, name = "dev"),
 })
 public sealed interface ClientMessage {
 
@@ -38,4 +39,7 @@ public sealed interface ClientMessage {
 
     /** 대기하다 자리가 났다는 slot 을 받고 들어가겠다고 함 */
     record Enter() implements ClientMessage {}
+
+    /** 개발용: 바로 불러 보기 (a = "dolphin"). 서버 설정 sumbi.sea-friends.dev-events 가 켜져 있을 때만 */
+    record Dev(String a) implements ClientMessage {}
 }

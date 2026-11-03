@@ -14,13 +14,14 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
  * 오늘의 바다를 Redis 에 (서버를 다시 켜도, 서버가 여러 대여도 같은 값).
  * 키에 한국 날짜를 넣어 자정이 지나면 자연스럽게 새 키 → 초기화. 키는 48시간 뒤 사라짐.
  *   sumbi:today:2026-11-03:divers  SET  (재접속 토큰, 중복 없이)
- *   sumbi:today:2026-11-03:items   HASH (conch/abalone/urchin → 개수)
+ *   sumbi:today:2026-11-03:items   HASH (conch/abalone/urchin → 개수, dolphin → 돌고래가 나타난 횟수)
  *   sumbi:today:2026-11-03:ver     값이 바뀔 때마다 +1 (방송할지 판단)
  * 쓰기·만료 설정·버전 증가를 Lua 스크립트 하나로 → 여러 서버가 동시에 써도 원자적.
  */
 public class RedisDailyStats implements DailyStats {
     static final Duration TTL = Duration.ofHours(48);
     private static final List<String> ITEMS = List.of("conch", "abalone", "urchin");
+    private static final String DOLPHIN = "dolphin";
 
     /** KEYS: divers, ver / ARGV: token, ttl 초 */
     private static final DefaultRedisScript<Long> ADD_DIVER = new DefaultRedisScript<>("""
@@ -96,6 +97,12 @@ public class RedisDailyStats implements DailyStats {
         redis.execute(ADD_ITEM, List.of(key(d, "items"), key(d, "ver")), item, ttl());
     }
 
+    @Override
+    public void recordDolphin() {
+        LocalDate d = today();
+        redis.execute(ADD_ITEM, List.of(key(d, "items"), key(d, "ver")), DOLPHIN, ttl());
+    }
+
     private record Read(LocalDate day, TodayStats stats, long ver) {}
 
     private Read read() {
@@ -103,13 +110,16 @@ public class RedisDailyStats implements DailyStats {
         List<?> r = redis.execute(READ, List.of(key(d, "divers"), key(d, "items"), key(d, "ver")));
         Map<String, Integer> items = new LinkedHashMap<>();
         for (String it : ITEMS) items.put(it, 0);
+        int dolphins = 0;
         List<?> flat = (List<?>) r.get(1);
         for (int i = 0; i + 1 < flat.size(); i += 2) {
             String it = String.valueOf(flat.get(i));
-            if (items.containsKey(it)) items.put(it, Integer.parseInt(String.valueOf(flat.get(i + 1))));
+            int n = Integer.parseInt(String.valueOf(flat.get(i + 1)));
+            if (items.containsKey(it)) items.put(it, n);
+            else if (DOLPHIN.equals(it)) dolphins = n;
         }
         int divers = ((Number) r.get(0)).intValue();
-        return new Read(d, new TodayStats(divers, Map.copyOf(items)), Long.parseLong(String.valueOf(r.get(2))));
+        return new Read(d, new TodayStats(divers, Map.copyOf(items), dolphins), Long.parseLong(String.valueOf(r.get(2))));
     }
 
     @Override

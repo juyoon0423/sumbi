@@ -152,8 +152,9 @@ if (import.meta.env.DEV) {
     import('../world/sea/friends/devEvents'),
     import('../world/sea/friends/Cephalopods'),
     import('../world/sea/friends/Turtle'),
+    import('../world/sea/friends/dolphinState'),
     import('../world/sea/friends/SeaFriends'),
-  ]).then(([rt, sf, inp, rm, bt, zone, time, session, layout, float, gulls, star, fcam, quality, dev, ceph, turtle, friends]) => {
+  ]).then(([rt, sf, inp, rm, bt, zone, time, session, layout, float, gulls, star, fcam, quality, dev, ceph, turtle, dol, friends]) => {
     ;(window as unknown as Record<string, unknown>).__sumbi = {
       player: rt.player,
       cameraRig: rt.cameraRig,
@@ -185,9 +186,10 @@ if (import.meta.env.DEV) {
       /** 하늘: 갈매기 바로 날리기 · 별똥별 바로 떨어뜨리기 */
       gulls: () => gulls.gullControl.spawn(),
       shootingStar: () => star.shootingStarControl.fire(),
-      /** 바다 친구들: turtle() 다음 잠수에 · octopus.peekNow() · 자리 확인 */
+      /** 바다 친구들: dolphin() 같은 바다 모두에게 · turtle() 다음 잠수에 · octopus.peekNow() · 자리 확인 */
+      dolphin: dev.callDolphins,
       turtle: dev.callTurtle,
-      friends: { octopus: ceph.octopusDebug, turtle: turtle.turtleControl, schools: friends.schoolSpots, where: friends.friendsDebug },
+      friends: { octopus: ceph.octopusDebug, turtle: turtle.turtleControl, dolphins: dol.useDolphins, schools: friends.schoolSpots, where: friends.friendsDebug },
     }
   })
 }

@@ -70,6 +70,18 @@ public class ResilientDailyStats implements DailyStats {
     }
 
     @Override
+    public void recordDolphin() {
+        memory.recordDolphin();
+        if (!usingPrimary()) return;
+        try {
+            primary.recordDolphin();
+            ok();
+        } catch (RuntimeException e) {
+            failed(e);
+        }
+    }
+
+    @Override
     public TodayStats snapshot() {
         if (usingPrimary()) {
             try {

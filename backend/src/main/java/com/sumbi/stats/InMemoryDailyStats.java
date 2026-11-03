@@ -17,6 +17,7 @@ public class InMemoryDailyStats implements DailyStats {
     private LocalDate day;
     private final Set<String> divers = new HashSet<>();
     private final Map<String, Integer> items = new LinkedHashMap<>();
+    private int dolphins;
     private long version;
 
     public InMemoryDailyStats(Clock clock) {
@@ -32,6 +33,7 @@ public class InMemoryDailyStats implements DailyStats {
         day = d;
         divers.clear();
         items.clear();
+        dolphins = 0;
         items.put("conch", 0);
         items.put("abalone", 0);
         items.put("urchin", 0);
@@ -59,9 +61,16 @@ public class InMemoryDailyStats implements DailyStats {
     }
 
     @Override
+    public synchronized void recordDolphin() {
+        rollIfNeeded();
+        dolphins++;
+        version++;
+    }
+
+    @Override
     public synchronized TodayStats snapshot() {
         rollIfNeeded();
-        return new TodayStats(divers.size(), Map.copyOf(items));
+        return new TodayStats(divers.size(), Map.copyOf(items), dolphins);
     }
 
     @Override

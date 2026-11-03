@@ -102,6 +102,19 @@ class RedisDailyStatsTest {
     }
 
     @Test
+    void 돌고래_횟수는_해산물과_따로() {
+        var s = new RedisDailyStats(redis, Clock.systemUTC());
+        long v0 = s.version();
+        s.recordDolphin();
+        s.recordDolphin();
+        assertThat(s.snapshot().dolphins()).isEqualTo(2);
+        assertThat(s.snapshot().items()).doesNotContainKey("dolphin");
+        assertThat(s.version()).isEqualTo(v0 + 2);
+        // 서버를 다시 켜도 그대로
+        assertThat(new RedisDailyStats(redis, Clock.systemUTC()).snapshot().dolphins()).isEqualTo(2);
+    }
+
+    @Test
     void 서버를_다시_켜도_그대로() {
         new RedisDailyStats(redis, Clock.systemUTC()).recordHarvest("urchin");
         new RedisDailyStats(redis, Clock.systemUTC()).recordDiver("a");

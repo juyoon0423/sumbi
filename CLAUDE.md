@@ -18,7 +18,7 @@ cd frontend && npm run build && npm run lint  # 타입 검사 + 빌드, oxlint
 
 - 환경변수·설정은 README "로컬 실행" 참고 (`SUMBI_*`, `VITE_WS_URL`). 서버가 없으면 프론트는 혼자 하는 바다로 자동 전환.
 - `./dev.sh` 는 Redis 가 설치돼 있으면 함께 띄움(`.redis/`, 커밋 안 함), 없으면 메모리 집계. Ctrl+C 로 전부 종료.
-- 개발용: `/dev/character` (캐릭터 랩), 브라우저 콘솔 `window.__sumbi` (플레이어·카메라·해산물·원격 해녀·게임 스토어·불턱·`setTime('night')`·`float.start()`·`gulls()`·`shootingStar()`), 시간대 고정 `?time=dawn|day|sunset|night` 또는 `?hour=5.6`, `?quality=high|medium|low`, `?debug=1` (fps·품질 표시)
+- 개발용: `/dev/character` (캐릭터 랩), 브라우저 콘솔 `window.__sumbi` (플레이어·카메라·해산물·원격 해녀·게임 스토어·불턱·`setTime('night')`·`float.start()`·`gulls()`·`shootingStar()`·`dolphin()`·`turtle()`·`friends`), 시간대 고정 `?time=dawn|day|sunset|night` 또는 `?hour=5.6`, `?quality=high|medium|low`, `?event=dolphin|turtle` (바다 친구 바로 부르기, 개발 빌드만), `?debug=1` (fps·품질 표시)
 - 휴대폰 확인: 같은 와이파이에서 `./dev.sh` 가 찍어 주는 `http://<내부 IP>:5173/?debug=1`
 - 백엔드를 끄고 켤 때 `lsof -ti tcp:8080 -sTCP:LISTEN` 으로 서버 프로세스만 고를 것 (그냥 `tcp:8080` 은 연결된 브라우저까지 잡음)
 - **배포**: [docs/deploy.md](docs/deploy.md). 운영 구성 로컬 확인은 `cd deploy && ./local.sh up` (Docker Desktop, http://localhost:8090) → 프론트는 `VITE_WS_URL=ws://localhost:8090/ws npx vite --port 5174`, 끝나면 `./local.sh down`. 동시접속 상한: `./local.sh cap 5` (운영 `deploy/cap.sh`)
@@ -33,6 +33,7 @@ cd frontend && npm run build && npm run lint  # 타입 검사 + 빌드, oxlint
   - 휴대폰 조작: `capture-mobile.mjs <폴더>` (실제 터치 이벤트로 조이스틱·둘러보기·잠수 버튼·두 손가락, HUD 겹침 검사, 세로·가로·데스크톱)
   - 둥둥: `capture-dungdung.mjs <폴더>` (백엔드 필요, 눕기·하늘·일어나기·다른 창·시간대 4개·별똥별·일지·모바일)
   - 대기열: `capture-queue.mjs <폴더>` (백엔드·Redis 필요, Redis 로 상한을 바꿔 대기·자리 카드·입장·상한 올리기. `SUMBI_URL`·`SUMBI_API`·`SUMBI_REDIS_CLI` 로 Docker 구성에도)
+  - 바다 친구들: `capture-sea-friends.mjs <폴더> [all|under|approach|turtle|dolphin]` (백엔드 필요, `SUMBI_DEV_EVENTS=true` — dev.sh 기본. 물속 생물 낮/밤·흩어짐·문어·거북·돌고래 브라우저 3개) · `fps-sea-friends.mjs <폴더> <이름>` (휴대폰 크기 fps, `SUMBI_QUALITY=`)
   - 무중단 배포: `capture-deploy-switch.mjs <폴더>` (`deploy/local.sh up` + 5174 프론트, 접속한 채 blue↔green → 1012 → 다시 접속)
   - 설치된 Chrome을 씀 (`channel: 'chrome'`). 확정 캡처는 `docs/screenshots/<주제>/`에 JPEG로 저장 (용량 줄이기).
 - **단계(또는 의미 있는 작업)가 끝날 때마다**: 비밀 정보 점검(API 키·비밀번호·토큰·`.env`·키 파일) → 의미 있는 단위로 커밋 → `main`에 push.

@@ -2,6 +2,7 @@ import { CONFIG, type ItemType } from '../config'
 import { nickOf } from '../haenyeo/customize'
 import { generateNickname } from '../lib/nickname'
 import { kstDateKey } from '../lib/today'
+import { localGapMs, localPass } from '../world/sea/friends/dolphinState'
 import { nextBasinCapacity, seaReturn } from '../world/bulteok/layout'
 import { planWalk, walkDuration } from '../world/bulteok/seatWalk'
 import { Emitter, type NetClient } from './NetClient'
@@ -34,6 +35,10 @@ export class OfflineNetClient implements NetClient {
   private restUntil = 0
   private seat = -1
   private walkUntil = 0
+  // 남방큰돌고래 흉내: 서버처럼 평균 30분에 한 번
+  private dolphinTimer: number | undefined
+  private dolphinSeq = 0
+  private dolphinUntil = 0
 
   constructor(opts: Options) {
     this.opts = opts
@@ -52,11 +57,32 @@ export class OfflineNetClient implements NetClient {
         today: this.today,
       })
       if (this.opts.simulateOthers) this.scheduleFakeEvent()
+      this.scheduleDolphins()
     }, 0)
   }
 
   disconnect() {
     window.clearTimeout(this.timer)
+    window.clearTimeout(this.dolphinTimer)
+  }
+
+  // ── 남방큰돌고래 (서버 DolphinSchedule 과 같은 방식) ──
+  private scheduleDolphins() {
+    window.clearTimeout(this.dolphinTimer)
+    this.dolphinTimer = window.setTimeout(() => {
+      this.startDolphins()
+      this.scheduleDolphins()
+    }, localGapMs())
+  }
+
+  private startDolphins() {
+    if (performance.now() < this.dolphinUntil) return
+    const pass = localPass(++this.dolphinSeq)
+    this.dolphinUntil = performance.now() + pass.dur
+    this.emitter.emit({ t: 'dolphin', ...pass })
+    this.today.dolphins = (this.today.dolphins ?? 0) + 1
+    this.saveToday()
+    this.emitter.emit({ t: 'today', ...this.today, items: { ...this.today.items } })
   }
 
   onMessage(handler: Parameters<NetClient['onMessage']>[0]) {
@@ -64,6 +90,10 @@ export class OfflineNetClient implements NetClient {
   }
 
   send(msg: ClientMessage) {
+    if (msg.t === 'dev') {
+      if (import.meta.env.DEV && msg.a === 'dolphin') this.startDolphins()
+      return
+    }
     if (msg.t === 'zone') {
       window.setTimeout(() => {
         if (msg.to === 'bulteok') {

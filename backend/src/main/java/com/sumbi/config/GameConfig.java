@@ -9,6 +9,7 @@ import com.sumbi.room.MovementValidator;
 import com.sumbi.room.PrepLedger;
 import com.sumbi.room.Room;
 import com.sumbi.room.RoomManager;
+import com.sumbi.sea.DolphinSchedule;
 import com.sumbi.stats.DailyStats;
 import com.sumbi.stats.InMemoryDailyStats;
 import com.sumbi.stats.RedisDailyStats;
@@ -70,11 +71,13 @@ public class GameConfig {
     }
 
     @Bean
-    public GameServer gameServer(SumbiProperties props, OpsProperties ops, CustomizeCatalog catalog, RoomManager rooms,
-            DailyStats stats, Alerts alerts) {
+    public GameServer gameServer(SumbiProperties props, OpsProperties ops, SeaFriendsProperties sea, CustomizeCatalog catalog,
+            RoomManager rooms, DailyStats stats, Alerts alerts) {
         GameServer g = new GameServer(props, catalog, rooms, stats, System::currentTimeMillis, ThreadLocalRandom.current(),
             ops.slotOfferMs());
         g.setAlerts(alerts);
+        g.setSeaFriends(new DolphinSchedule.Settings(sea.dolphinMeanMs(), sea.dolphinMinMs(), sea.dolphinMaxMs()), sea.devEvents());
+        log.info("남방큰돌고래: 바다마다 평균 {}분에 한 번{}", sea.dolphinMeanMs() / 60_000, sea.devEvents() ? " (개발용 바로 부르기 켜짐)" : "");
         return g;
     }
 

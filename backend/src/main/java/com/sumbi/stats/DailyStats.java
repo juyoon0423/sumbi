@@ -9,6 +9,9 @@ public interface DailyStats {
 
     void recordHarvest(String item);
 
+    /** 어느 바다에서든 남방큰돌고래가 한 번 나타남 */
+    void recordDolphin();
+
     TodayStats snapshot();
 
     /** 값이 바뀔 때마다 증가 (방송할지 판단용) */

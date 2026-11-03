@@ -51,6 +51,14 @@ sumbi:
     max-speed: 5
     slack: 1.0
 
+  # 바다 친구들: 남방큰돌고래 (바다마다 평균 30분에 한 번, 8분~90분 사이)
+  sea-friends:
+    dolphin-mean-ms: ${SUMBI_DOLPHIN_MEAN_MS:1800000}
+    dolphin-min-ms: ${SUMBI_DOLPHIN_MIN_MS:480000}
+    dolphin-max-ms: ${SUMBI_DOLPHIN_MAX_MS:5400000}
+    # 개발용 바로 부르기 (?event=dolphin). dev.sh 가 켬, 운영은 꺼짐
+    dev-events: ${SUMBI_DEV_EVENTS:false}
+
   ops:
     slot-offer-ms: ${SUMBI_SLOT_OFFER_MS:45000}
     cap-poll-ms: ${SUMBI_CAP_POLL_MS:5000}

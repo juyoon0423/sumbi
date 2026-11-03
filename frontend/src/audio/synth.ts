@@ -393,3 +393,50 @@ export function gull(ctx: AudioContext, dest: AudioNode, v = 1) {
     o.stop(t + 0.26)
   }
 }
+
+/** 멀리서 돌고래 소리: 휘파람처럼 오르내리는 소리 + 딸깍딸깍 (v: 거리에 따른 크기) */
+export function dolphin(ctx: AudioContext, noise: AudioBuffer, dest: AudioNode, v = 1) {
+  const t0 = ctx.currentTime
+  const calls = 1 + Math.floor(Math.random() * 2)
+  for (let c = 0; c < calls; c++) {
+    const t = t0 + c * (0.45 + Math.random() * 0.2)
+    const base = 3200 + Math.random() * 1400
+    const dur = 0.35 + Math.random() * 0.25
+    const o = ctx.createOscillator()
+    o.type = 'sine'
+    o.frequency.setValueAtTime(base, t)
+    o.frequency.linearRampToValueAtTime(base * 1.6, t + dur * 0.45)
+    o.frequency.exponentialRampToValueAtTime(base * 0.9, t + dur)
+    // 살짝 떨림
+    const lfo = ctx.createOscillator()
+    lfo.frequency.value = 22
+    const lg = ctx.createGain()
+    lg.gain.value = 90
+    lfo.connect(lg).connect(o.frequency)
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.linearRampToValueAtTime(0.035 * v, t + 0.04)
+    g.gain.setValueAtTime(0.035 * v, t + dur * 0.7)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+    o.connect(g).connect(dest)
+    o.start(t)
+    lfo.start(t)
+    o.stop(t + dur + 0.02)
+    lfo.stop(t + dur + 0.02)
+  }
+  // 딸깍딸깍
+  const clicks = 6 + Math.floor(Math.random() * 8)
+  for (let i = 0; i < clicks; i++) {
+    const t = t0 + 0.9 + i * (0.035 + Math.random() * 0.02)
+    const n = noiseSource(ctx, noise)
+    const hp = ctx.createBiquadFilter()
+    hp.type = 'highpass'
+    hp.frequency.value = 3000
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.05 * v, t)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.012)
+    n.connect(hp).connect(g).connect(dest)
+    n.start(t, Math.random() * 2)
+    n.stop(t + 0.015)
+  }
+}

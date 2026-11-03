@@ -103,7 +103,7 @@ function TodaySea() {
     return () => document.body.classList.remove('today-open')
   }, [open])
   if (!today) return null
-  const { divers, items } = today
+  const { divers, items, dolphins = 0 } = today
   return (
     <button className="glass today" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
       <div className="today-head">
@@ -114,6 +114,11 @@ function TodaySea() {
         <div className="today-body">
           해녀 <b>{divers.toLocaleString()}</b>명이 소라 <b>{items.conch.toLocaleString()}</b>개 · 전복{' '}
           <b>{items.abalone.toLocaleString()}</b>개 · 성게 <b>{items.urchin.toLocaleString()}</b>개를 땄어요
+          {dolphins > 0 && (
+            <div className="today-dolphin">
+              🐬 오늘 돌고래가 <b>{dolphins}</b>번 나타났어요
+            </div>
+          )}
         </div>
       )}
     </button>

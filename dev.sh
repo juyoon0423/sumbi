@@ -15,6 +15,8 @@ if [[ -z "${SUMBI_ALLOWED_ORIGINS:-}" ]]; then
   [[ -n "$LAN_IP" ]] && SUMBI_ALLOWED_ORIGINS+=",http://$LAN_IP:*"
   export SUMBI_ALLOWED_ORIGINS
 fi
+# 개발용 바로 부르기 (?event=dolphin 으로 같은 바다 모두에게 돌고래)
+export SUMBI_DEV_EVENTS="${SUMBI_DEV_EVENTS:-true}"
 
 # 끝낼 때 이 스크립트가 띄운 프로세스 전부 정리
 trap 'trap - EXIT INT TERM; kill 0 2>/dev/null || true' EXIT INT TERM

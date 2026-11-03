@@ -12,7 +12,11 @@ import com.sumbi.protocol.ServerMessage;
 import com.sumbi.protocol.TodayStats;
 import com.sumbi.room.Room;
 import com.sumbi.room.RoomManager;
+import com.sumbi.sea.DolphinSchedule;
 import com.sumbi.stats.DailyStats;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -60,6 +64,10 @@ public class GameServer {
     /** 상한·대기 알림: 상태가 바뀐 순간에만 (같은 상태가 이어지면 다시 안 보냄) */
     private boolean wasFull;
     private boolean hadWaiting;
+    /** 바다(방)마다 남방큰돌고래 일정. 잠금: 이 맵 (GameServer → dolphins → Room 순서) */
+    private final Map<String, DolphinSchedule> dolphins = new HashMap<>();
+    private volatile DolphinSchedule.Settings dolphinSettings = DolphinSchedule.Settings.DEFAULT;
+    private volatile boolean devEvents;
 
     public GameServer(SumbiProperties props, CustomizeCatalog catalog, RoomManager rooms, DailyStats stats,
             LongSupplier clock, RandomGenerator random) {
@@ -120,6 +128,9 @@ public class GameServer {
                 if (s.player != null) s.room.requestSeat(s.player.id, seat.seat(), now);
             }
             case ClientMessage.Enter enter -> acceptSlot(c, s);
+            case ClientMessage.Dev dev -> {
+                if (devEvents && s.player != null && "dolphin".equals(dev.a())) triggerDolphin(s.room, now);
+            }
         }
     }
 
@@ -164,6 +175,7 @@ public class GameServer {
                 s.room = room;
                 s.player = back;
                 reservations.remove(token);
+                sendActiveDolphin(c, room, clock.getAsLong());
                 log.info("reattached {} #{} ({})", room.id, back.id, nick.display());
                 return;
             }
@@ -214,6 +226,7 @@ public class GameServer {
         }
         s.player = p;
         s.pendingHello = null;
+        sendActiveDolphin(c, s.room, clock.getAsLong());
         stats.recordDiver(hello.token());
         log.info("joined {} #{} ({}) total={}", s.room.id, p.id, hello.nick().display(), rooms.totalPlayers());
         checkAlerts();
@@ -294,6 +307,74 @@ public class GameServer {
         return closing;
     }
 
+    // ── 바다 친구들: 남방큰돌고래 ──
+
+    /** 등장 간격 설정과 개발용 바로 부르기 허용 */
+    public void setSeaFriends(DolphinSchedule.Settings settings, boolean devEvents) {
+        this.dolphinSettings = settings;
+        this.devEvents = devEvents;
+    }
+
+    private static ServerMessage.Dolphin dolphinMessage(DolphinSchedule.Pass p, long now) {
+        return new ServerMessage.Dolphin(p.seq(), p.elapsed(now), p.dur(), p.from(), p.to(), p.n(), p.seed());
+    }
+
+    private DolphinSchedule schedule(Room room, long now) {
+        return dolphins.computeIfAbsent(room.id, id -> new DolphinSchedule(dolphinSettings, random, now));
+    }
+
+    /** 돌고래가 지나가는 중에 들어온 사람에게 남은 장면 (welcome 바로 뒤) */
+    private void sendActiveDolphin(Client c, Room room, long now) {
+        if (room == null) return;
+        DolphinSchedule.Pass p;
+        synchronized (dolphins) {
+            DolphinSchedule d = dolphins.get(room.id);
+            p = d == null ? null : d.active(now);
+        }
+        if (p != null) c.send(dolphinMessage(p, now));
+    }
+
+    /** 개발용: 이 바다에 바로 (dev-events 가 켜져 있을 때만) */
+    public void triggerDolphin(Room room, long now) {
+        DolphinSchedule.Pass p;
+        synchronized (dolphins) {
+            p = schedule(room, now).trigger(now);
+            if (p != null) room.broadcast(dolphinMessage(p, now));
+        }
+        if (p != null) {
+            stats.recordDolphin();
+            log.info("dolphins (dev) in {}: {} of them", room.id, p.n());
+        }
+    }
+
+    /** 1초마다: 바다마다 등장할 때가 되었는지. 사라진 바다의 일정은 정리 */
+    void tickDolphins(long now) {
+        List<Room> list = rooms.rooms();
+        int started = 0;
+        synchronized (dolphins) {
+            List<String> alive = new ArrayList<>();
+            for (Room room : list) {
+                alive.add(room.id);
+                DolphinSchedule.Pass p = schedule(room, now).tick(now);
+                if (p == null) continue;
+                room.broadcast(dolphinMessage(p, now));
+                started++;
+                log.info("dolphins in {}: {} of them, {}s", room.id, p.n(), p.dur() / 1000);
+            }
+            dolphins.keySet().retainAll(alive);
+        }
+        // 집계(Redis)는 잠금 밖에서
+        for (int i = 0; i < started; i++) stats.recordDolphin();
+    }
+
+    /** 테스트·상태 확인: 이 바다의 다음 등장 시각 */
+    public Long nextDolphinAt(String roomId) {
+        synchronized (dolphins) {
+            DolphinSchedule d = dolphins.get(roomId);
+            return d == null ? null : d.nextAt();
+        }
+    }
+
     // ── 주기 작업 ──
 
     /** 100ms: 방마다 움직인 해녀 위치를 묶어 방송 */
@@ -319,6 +400,7 @@ public class GameServer {
             rooms.removeIfEmpty(room);
         }
         reservations.values().removeIf(r -> r.expiresAt() <= now);
+        tickDolphins(now);
         synchronized (this) {
             // 답이 없던 자리 제안은 거두고 맨 뒤로 → 다음 사람에게
             int expired = admission.expire(now).size();

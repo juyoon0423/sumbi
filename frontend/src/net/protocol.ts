@@ -22,6 +22,8 @@ export type ItemCounts = Record<ItemType, number>
 export interface TodayStats {
   divers: number
   items: ItemCounts
+  /** 오늘 (모든 바다에서) 남방큰돌고래가 나타난 횟수 (옛 서버엔 없음) */
+  dolphins?: number
 }
 
 /** 꾸미기 색 (id는 haenyeo/customize.ts 팔레트의 id, 서버가 같은 목록으로 검증) */
@@ -70,6 +72,8 @@ export type ClientMessage =
   | { t: 'ping'; ts: number }
   /** 대기하다 자리가 났다는 slot 을 받고 들어가겠다고 함 */
   | { t: 'enter' }
+  /** 개발용: 바로 불러 보기 (서버가 dev-events 를 켰을 때만 받음, 배포 빌드에선 보내지 않음) */
+  | { t: 'dev'; a: 'dolphin' }
 
 // ── 서버 → 클라이언트 ──
 export type ServerMessage =
@@ -101,5 +105,10 @@ export type ServerMessage =
   /** 그 자리는 이미 누가 있거나 가는 중 (본인에게만) */
   | { t: 'seat_no'; seat: number }
   | ({ t: 'today' } & TodayStats)
+  /**
+   * 남방큰돌고래 무리가 지나감 (같은 바다 모두에게, 늦게 들어온 사람에겐 입장 직후).
+   * el: 시작한 지 지난 ms (내 시계로 시작 시각을 맞춤), dur: 지나가는 ms, from/to: [x, z], n: 마리 수, seed: 뛰는 박자·높이
+   */
+  | { t: 'dolphin'; seq: number; el: number; dur: number; from: [number, number]; to: [number, number]; n: number; seed: number }
   | { t: 'pong'; ts: number }
   | { t: 'err'; code: string; msg: string }

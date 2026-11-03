@@ -330,6 +330,11 @@ button {
   color: rgba(255, 255, 255, 0.88);
 }
 
+.today-dolphin {
+  margin-top: 5px;
+  opacity: 0.92;
+}
+
 .today-body b {
   color: #fff;
 }

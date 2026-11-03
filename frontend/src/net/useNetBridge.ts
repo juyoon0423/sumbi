@@ -15,6 +15,8 @@ import { useSession } from '../store/sessionStore'
 import { useToasts } from '../store/toastStore'
 import { net } from '.'
 import { buildHello } from './hello'
+import { useDolphins } from '../world/sea/friends/dolphinState'
+import { noteDolphins } from '../world/sea/friends/encounters'
 import type { ServerMessage, Vec3 } from './protocol'
 import { applyEvent, applyPrep, applySeatMove, applySnap, applyZone, remoteNick, remotes, useRemotes } from './remotes'
 
@@ -87,6 +89,14 @@ function enterFromQueue(p: Vec3 | undefined) {
 }
 
 /** 서버(또는 오프라인 흉내) 메시지를 스토어·소리·토스트로 연결 */
+/** 남방큰돌고래: 같은 바다의 모두에게 같은 순간. 늦게 들어왔으면 남은 장면부터 */
+function onDolphins(msg: Extract<ServerMessage, { t: 'dolphin' }>) {
+  if (msg.el >= msg.dur) return
+  useDolphins.getState().begin(msg)
+  useToasts.getState().push(msg.el < 4000 ? '돌고래가 지나가요!' : '돌고래가 지나가고 있어요!')
+  noteDolphins()
+}
+
 export function useNetBridge() {
   useEffect(() => {
     let wasWelcomed = false
@@ -115,6 +125,8 @@ export function useNetBridge() {
           if (fromQueue) enterFromQueue(msg.you.p)
           game.setSelf(msg.you.id)
           game.setToday(msg.today)
+          // 다른 바다(또는 혼자 하던 바다)의 돌고래는 접음. 이 바다에 지나가는 중이면 서버가 바로 뒤에 보내 줌
+          useDolphins.getState().clear()
           useRemotes.getState().reset(msg.players)
           // 서버가 정해 준 시작 위치 (처음 입장할 때만: 재접속이면 지금 위치 유지)
           if (msg.you.p && player.pose.state === 'surfaceIdle' && !wasWelcomed) {
@@ -145,7 +157,10 @@ export function useNetBridge() {
           applySnap(msg.ts, msg.ps, game.selfId)
           break
         case 'today':
-          game.setToday({ divers: msg.divers, items: msg.items })
+          game.setToday({ divers: msg.divers, items: msg.items, dolphins: msg.dolphins })
+          break
+        case 'dolphin':
+          onDolphins(msg)
           break
         case 'zone': {
           if (msg.id === game.selfId) {

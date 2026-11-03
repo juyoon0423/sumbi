@@ -39,4 +39,14 @@ class InMemoryDailyStatsTest {
         assertThat(s.snapshot().items()).containsEntry("urchin", 0);
         assertThat(s.version()).isGreaterThan(v);
     }
+
+    @Test
+    void 돌고래_횟수() {
+        var s = new InMemoryDailyStats(java.time.Clock.systemUTC());
+        long v0 = s.version();
+        s.recordDolphin();
+        assertThat(s.snapshot().dolphins()).isEqualTo(1);
+        assertThat(s.snapshot().items()).doesNotContainKey("dolphin");
+        assertThat(s.version()).isEqualTo(v0 + 1);
+    }
 }
