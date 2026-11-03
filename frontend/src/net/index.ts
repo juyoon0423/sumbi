@@ -149,9 +149,11 @@ if (import.meta.env.DEV) {
     import('../world/sky/ShootingStar'),
     import('../player/FollowCamera'),
     import('../lib/quality'),
+    import('../world/sea/friends/devEvents'),
     import('../world/sea/friends/Cephalopods'),
+    import('../world/sea/friends/Turtle'),
     import('../world/sea/friends/SeaFriends'),
-  ]).then(([rt, sf, inp, rm, bt, zone, time, session, layout, float, gulls, star, fcam, quality, ceph, friends]) => {
+  ]).then(([rt, sf, inp, rm, bt, zone, time, session, layout, float, gulls, star, fcam, quality, dev, ceph, turtle, friends]) => {
     ;(window as unknown as Record<string, unknown>).__sumbi = {
       player: rt.player,
       cameraRig: rt.cameraRig,
@@ -183,8 +185,9 @@ if (import.meta.env.DEV) {
       /** 하늘: 갈매기 바로 날리기 · 별똥별 바로 떨어뜨리기 */
       gulls: () => gulls.gullControl.spawn(),
       shootingStar: () => star.shootingStarControl.fire(),
-      /** 바다 친구들: octopus.peekNow() · 자리 확인 */
-      friends: { octopus: ceph.octopusDebug, schools: friends.schoolSpots, where: friends.friendsDebug },
+      /** 바다 친구들: turtle() 다음 잠수에 · octopus.peekNow() · 자리 확인 */
+      turtle: dev.callTurtle,
+      friends: { octopus: ceph.octopusDebug, turtle: turtle.turtleControl, schools: friends.schoolSpots, where: friends.friendsDebug },
     }
   })
 }

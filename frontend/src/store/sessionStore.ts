@@ -19,6 +19,10 @@ interface SessionState {
   floatMs: number
   /** 별똥별을 봤는지 */
   shootingStar: boolean
+  /** 바다거북을 만났는지 */
+  turtle: boolean
+  /** 남방큰돌고래를 봤는지 (그날 처음 봤을 때만 true → 일지) */
+  dolphin: boolean
   start: () => void
   addSumbi: () => void
   addHarvest: (item: ItemType) => void
@@ -33,7 +37,10 @@ export const useSession = create<SessionState>((set, get) => ({
   met: new Set(),
   floatMs: 0,
   shootingStar: false,
-  start: () => set({ startedAt: Date.now(), sumbi: 0, harvested: zero(), prepped: zero(), met: new Set(), floatMs: 0, shootingStar: false }),
+  turtle: false,
+  dolphin: false,
+  start: () =>
+    set({ startedAt: Date.now(), sumbi: 0, harvested: zero(), prepped: zero(), met: new Set(), floatMs: 0, shootingStar: false, turtle: false, dolphin: false }),
   addSumbi: () => set({ sumbi: get().sumbi + 1 }),
   addHarvest: (item) => set({ harvested: { ...get().harvested, [item]: get().harvested[item] + 1 } }),
   addPrepped: (item) => set({ prepped: { ...get().prepped, [item]: get().prepped[item] + 1 } }),

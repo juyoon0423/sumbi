@@ -17,6 +17,10 @@ export interface JournalEntry {
   floatMs?: number
   /** 둥둥 중 별똥별을 봄 */
   shootingStar?: boolean
+  /** 바다거북을 만남 */
+  turtle?: boolean
+  /** 남방큰돌고래를 봄 (그날 처음) */
+  dolphin?: boolean
   preset: TimePreset
   nick: string
 }
@@ -137,8 +141,10 @@ export function drawCard(entry: JournalEntry, photo: HTMLCanvasElement | null, f
   ]
   if (entry.floatMs && entry.floatMs > 0) rows.push(['둥둥', skyLine(entry.floatMs)])
   if (entry.shootingStar) rows.push(['밤하늘', '별똥별을 봤어요'])
+  const friends = friendsLine(entry)
+  if (friends) rows.push(['바다 친구', friends])
   y += 34
-  const rowH = rows.length > 5 ? 58 : rows.length > 4 ? 66 : 76
+  const rowH = rows.length > 6 ? 52 : rows.length > 5 ? 58 : rows.length > 4 ? 66 : 76
   const bh = Math.min(60, rowH - 8)
   for (const [k, v] of rows) {
     y += rowH
@@ -163,6 +169,14 @@ export function drawCard(entry: JournalEntry, photo: HTMLCanvasElement | null, f
   const brand = '숨비 · 제주 해녀 바다'
   g.fillText(brand, W - x - g.measureText(brand).width, H - 58)
   return c
+}
+
+/** 드문 만남 → "바다거북을 만났어요" · "남방큰돌고래를 봤어요" · 둘 다 */
+export function friendsLine(e: Pick<JournalEntry, 'turtle' | 'dolphin'>) {
+  if (e.turtle && e.dolphin) return '바다거북 · 남방큰돌고래를 만났어요'
+  if (e.turtle) return '바다거북을 만났어요'
+  if (e.dolphin) return '남방큰돌고래를 봤어요'
+  return null
 }
 
 /** 둥둥 시간 → "하늘을 12분 바라봤어요" */

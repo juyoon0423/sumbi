@@ -14,6 +14,9 @@ try {
 const CharacterLab = lazy(() => import('./dev/CharacterLab').then((m) => ({ default: m.CharacterLab })))
 const isLab = import.meta.env.DEV && location.pathname.startsWith('/dev/character')
 
+// 개발용: ?event=dolphin | turtle 로 바다 친구 바로 부르기 (배포 빌드엔 들어가지 않음)
+if (import.meta.env.DEV) void import('./world/sea/friends/devEvents').then((m) => m.installDevEvents())
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {isLab ? (

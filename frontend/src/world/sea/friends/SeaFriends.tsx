@@ -3,6 +3,7 @@ import { BottomCritters, Jellyfish, Starfish } from './Bottom'
 import { Octopuses, Squids } from './Cephalopods'
 import { DamselSchool, Followers } from './DamselSchool'
 import { FRIENDS } from './friendsConfig'
+import { Turtle } from './Turtle'
 import { friendsDebug, pickSpots } from './lifeUtil'
 
 // 바다 친구들: 잠수하면 바다가 살아 있다고 느끼게 (잡거나 딸 수는 없고, 다가가면 반응만).
@@ -24,6 +25,7 @@ export function SeaFriends() {
       <Starfish key={`s-${level}`} n={c.starfish} />
       <BottomCritters crabs={c.crabs} hermits={c.hermits} />
       <Jellyfish n={c.jelly} />
+      <Turtle />
     </group>
   )
 }
