@@ -14,6 +14,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
     @JsonSubTypes.Type(value = ClientMessage.Prep.class, name = "prep"),
     @JsonSubTypes.Type(value = ClientMessage.Seat.class, name = "seat"),
     @JsonSubTypes.Type(value = ClientMessage.Ping.class, name = "ping"),
+    @JsonSubTypes.Type(value = ClientMessage.Enter.class, name = "enter"),
 })
 public sealed interface ClientMessage {
 
@@ -34,4 +35,7 @@ public sealed interface ClientMessage {
     record Seat(Integer seat) implements ClientMessage {}
 
     record Ping(long ts) implements ClientMessage {}
+
+    /** 대기하다 자리가 났다는 slot 을 받고 들어가겠다고 함 */
+    record Enter() implements ClientMessage {}
 }

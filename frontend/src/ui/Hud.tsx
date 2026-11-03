@@ -46,6 +46,7 @@ function HintPill() {
 /** 상단 가운데: 서버 연결이 잠깐 끊겼을 때 */
 function NetStatusPill() {
   const status = useGame((s) => s.netStatus)
+  if (status === 'restarting') return <div className="pill net-status">바다를 새로 단장하고 있어요 · 곧 다시 이어져요</div>
   if (status !== 'reconnecting') return null
   return <div className="pill net-status">연결이 잠깐 끊겼어요 · 다시 연결하는 중…</div>
 }
@@ -538,15 +539,56 @@ function SeaCustomize() {
   )
 }
 
-/** 전체 상한을 넘었을 때 대기 화면 */
-function QueueOverlay() {
-  const ahead = useGame((s) => s.queueAhead)
-  if (ahead === null) return null
+/** 대기 중: 화면 구석에 작게 순번·예상 대기 (그동안은 혼자 하는 바다에서 놀기) */
+function QueueCorner() {
+  const queue = useGame((s) => s.queue)
+  const slot = useGame((s) => s.slotUntil)
+  if (!queue || slot !== null) return null
+  const eta = queue.eta === null ? '잠시 후' : queue.eta < 60 ? '1분 안' : `약 ${Math.round(queue.eta / 60)}분`
   return (
-    <div className="queue-overlay">
-      <div className="glass queue-card">
-        <b>바다가 붐벼요</b>
-        <span>잠시 파도 소리를 들으며 기다려 주세요{ahead > 0 ? ` (앞에 ${ahead}명)` : ''}</span>
+    <div className="glass queue-corner" title="자리가 나면 알려 드려요 · 그동안 혼자 바다에서 놀 수 있어요">
+      ⏳ 대기 {queue.ahead + 1}번째 · {eta}
+    </div>
+  )
+}
+
+/** 자리가 났어요: 들어가기 버튼 + 남은 시간. 다른 탭에 있으면 탭 제목으로도 알림 */
+function SlotCard() {
+  const until = useGame((s) => s.slotUntil)
+  const [left, setLeft] = useState(0)
+  const [sent, setSent] = useState(false)
+  useEffect(() => {
+    if (until === null) {
+      setSent(false)
+      return
+    }
+    const title = document.title
+    const tick = () => setLeft(Math.max(0, Math.ceil((until - Date.now()) / 1000)))
+    tick()
+    const id = window.setInterval(() => {
+      tick()
+      // 다른 탭에 있으면 제목을 번갈아 바꿔 눈에 띄게
+      document.title = document.hidden && Math.floor(Date.now() / 1000) % 2 === 0 ? '🌊 자리가 났어요' : title
+    }, 500)
+    return () => {
+      window.clearInterval(id)
+      document.title = title
+    }
+  }, [until])
+  if (until === null) return null
+  const enter = () => {
+    setSent(true)
+    net.send({ t: 'enter' })
+  }
+  return (
+    <div className="slot-wrap">
+      <div className="glass slot-card" role="dialog" aria-label="바다에 자리가 났어요">
+        <b>🌊 바다에 자리가 났어요</b>
+        <span>다른 해녀들과 함께하는 바다로 들어갈까요?</span>
+        <button className="entry-button" onClick={enter} disabled={sent}>
+          {sent ? '들어가는 중…' : '바다에 들어가기'}
+        </button>
+        <small>{left}초 안에 누르지 않으면 다음 분께 자리가 넘어가요</small>
       </div>
     </div>
   )
@@ -588,7 +630,7 @@ export function Hud() {
       <div className={`vignette ${under ? 'on' : ''}`} />
       <ZoneFade />
       <JournalOverlay />
-      <QueueOverlay />
+      <SlotCard />
       <div className="top-center">
         <NetStatusPill />
         <HintPill />
@@ -596,6 +638,7 @@ export function Hud() {
       </div>
       <div className="top-left">
         <Basket />
+        <QueueCorner />
         {/* 휴대폰: 아래쪽은 조이스틱·버튼 자리라 카드를 망사리 밑으로 (불턱에선 공동 대야만) */}
         {touchUI && inBulteok && <BasinCard />}
         {touchUI && !inBulteok && <TodaySea />}

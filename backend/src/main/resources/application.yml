@@ -21,6 +21,7 @@ sumbi:
   # 쉼표로 여러 개. 배포 때는 SUMBI_ALLOWED_ORIGINS 환경변수로 실제 프론트 주소를 넣는다
   allowed-origins: ${SUMBI_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*}
   room-capacity: ${SUMBI_ROOM_CAPACITY:50}
+  # 전체 동시접속 기본 상한. 운영 중에는 Redis 키 sumbi:config:max-total 로 서버를 끄지 않고 바꿈 (docs/deploy.md)
   max-total: ${SUMBI_MAX_TOTAL:500}
   tick-ms: 100
   heartbeat-timeout-ms: ${SUMBI_HEARTBEAT_TIMEOUT_MS:30000}
@@ -49,6 +50,15 @@ sumbi:
     # 프론트 최고 속도(약 2.4m/s)보다 넉넉히. 이보다 빠른 이동은 잘라냄
     max-speed: 5
     slack: 1.0
+
+  ops:
+    slot-offer-ms: ${SUMBI_SLOT_OFFER_MS:45000}
+    cap-poll-ms: ${SUMBI_CAP_POLL_MS:5000}
+    # 디스코드 웹훅 주소 (비밀: 저장소에 넣지 말고 서버 .env 에만). 비면 알림 끔
+    alert-webhook-url: ${SUMBI_ALERT_WEBHOOK_URL:}
+    alert-telegram-chat: ${SUMBI_ALERT_TELEGRAM_CHAT:}
+    alert-min-interval-ms: ${SUMBI_ALERT_MIN_INTERVAL_MS:600000}
+    alert-name: ${SUMBI_ALERT_NAME:[숨비]}
 
 logging:
   level:

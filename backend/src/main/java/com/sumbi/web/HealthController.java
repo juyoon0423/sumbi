@@ -20,6 +20,7 @@ public class HealthController {
             "status", "ok",
             "rooms", game.rooms().rooms().size(),
             "players", game.rooms().totalPlayers(),
+            "maxTotal", game.maxTotal(),
             "waiting", game.waitingCount());
     }
 }

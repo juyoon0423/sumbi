@@ -1,7 +1,14 @@
 import { Emitter, type NetClient } from './NetClient'
 import type { ClientMessage, HelloMessage, ServerMessage } from './protocol'
 
-export type NetStatus = 'connecting' | 'online' | 'reconnecting' | 'offline'
+/**
+ * connecting: 처음 연결 중 / online: 바다에 들어옴 / reconnecting: 잠깐 끊겨 다시 연결 중
+ * restarting: 서버가 새 버전으로 바뀌는 중(1012) / waiting: 바다가 붐벼 대기 중(그동안 혼자 하는 바다) / offline: 혼자 하는 바다
+ */
+export type NetStatus = 'connecting' | 'online' | 'reconnecting' | 'restarting' | 'waiting' | 'offline'
+
+/** WebSocket 닫기 코드 1012: 서버가 다시 시작하는 중 (배포) */
+const SERVICE_RESTART = 1012
 
 const TOKEN_KEY = 'sumbi.token'
 const PING_MS = 10_000
@@ -39,6 +46,8 @@ export class WsNetClient implements NetClient {
   private hello: HelloMessage | null = null
   private welcomed = false
   private everWelcomed = false
+  /** 한 번이라도 서버에 붙었음 (대기만 하다 끊겨도 "서버 없음"으로 보지 않음) */
+  private everOpened = false
   private closedByUser = false
   private retries = 0
   private pingTimer: number | undefined
@@ -76,6 +85,7 @@ export class WsNetClient implements NetClient {
     }, OPEN_TIMEOUT_MS)
     ws.onopen = () => {
       window.clearTimeout(this.openTimer)
+      this.everOpened = true
       const token = loadToken()
       this.raw({ ...this.hello!, ...(token ? { token } : {}) })
       this.pingTimer = window.setInterval(() => this.raw({ t: 'ping', ts: Date.now() }), PING_MS)
@@ -96,25 +106,38 @@ export class WsNetClient implements NetClient {
       }
       this.emitter.emit(msg)
     }
-    ws.onclose = () => this.handleClose()
+    ws.onclose = (e) => this.handleClose(e.code)
   }
 
-  private handleClose() {
+  private handleClose(code = 0) {
     window.clearTimeout(this.openTimer)
     window.clearInterval(this.pingTimer)
     this.ws = null
     this.welcomed = false
     if (this.closedByUser) return
-    if (!this.everWelcomed && this.retries === 0) {
+    if (!this.everWelcomed && !this.everOpened && this.retries === 0) {
       // 서버가 아예 없음
       this.opts.onUnavailable()
       return
     }
-    // 잠깐 끊김: 1, 2, 4… 최대 5초 간격으로 다시 시도
-    this.opts.onStatus('reconnecting')
-    const delay = Math.min(5_000, 1000 * 2 ** this.retries)
-    this.retries++
+    let delay: number
+    if (code === SERVICE_RESTART) {
+      // 서버가 새 버전으로 바뀌는 중: 모두가 한꺼번에 몰리지 않게 0.3~3초 사이 아무 때나
+      this.opts.onStatus('restarting')
+      delay = 300 + Math.random() * 2700
+      this.retries = 1
+    } else {
+      // 잠깐 끊김: 1, 2, 4… 최대 5초 간격(±30%)으로 다시 시도
+      this.opts.onStatus('reconnecting')
+      delay = Math.min(5_000, 1000 * 2 ** this.retries) * (0.7 + Math.random() * 0.6)
+      this.retries++
+    }
     this.retryTimer = window.setTimeout(() => this.open(), delay)
+  }
+
+  /** 대기하다 자리가 났을 때 "들어가기" (welcome 전이라 send 로는 못 보냄) */
+  enter() {
+    this.raw({ t: 'enter' })
   }
 
   disconnect() {

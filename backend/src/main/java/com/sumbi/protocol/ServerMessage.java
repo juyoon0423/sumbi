@@ -9,6 +9,7 @@ import java.util.Map;
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "t")
 @JsonSubTypes({
     @JsonSubTypes.Type(value = ServerMessage.Queue.class, name = "queue"),
+    @JsonSubTypes.Type(value = ServerMessage.Slot.class, name = "slot"),
     @JsonSubTypes.Type(value = ServerMessage.Welcome.class, name = "welcome"),
     @JsonSubTypes.Type(value = ServerMessage.Join.class, name = "join"),
     @JsonSubTypes.Type(value = ServerMessage.Leave.class, name = "leave"),
@@ -26,7 +27,11 @@ import java.util.Map;
 })
 public sealed interface ServerMessage {
 
-    record Queue(int ahead) implements ServerMessage {}
+    /** 전체 상한으로 대기 중: 앞사람 수, 예상 대기(초, 모르면 null) */
+    record Queue(int ahead, Integer eta) implements ServerMessage {}
+
+    /** 자리가 났어요: ttl(ms) 안에 enter 를 보내면 입장, 아니면 대기열 맨 뒤로 */
+    record Slot(long ttl) implements ServerMessage {}
 
     /** you.p: 서버가 정해 준 시작 위치 (여럿이 겹치지 않게) */
     record You(int id, String nick, String token, LookInfo look, double[] p) {}

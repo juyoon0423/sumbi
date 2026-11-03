@@ -48,6 +48,11 @@ class ConcurrentJoinLeaveTest {
             for (ServerMessage m : got) if (m instanceof ServerMessage.Welcome w) return w;
             return null;
         }
+
+        /** 자리 제안을 받았는데 아직 안 들어감 */
+        boolean slotPending() {
+            return welcome() == null && got.stream().anyMatch(m -> m instanceof ServerMessage.Slot);
+        }
     }
 
     GameServer server(int capacity, int maxTotal, RoomManager[] out) {
@@ -151,15 +156,20 @@ class ConcurrentJoinLeaveTest {
                 g.connected(c);
                 g.received(c, hello(n));
                 maxSeen.accumulateAndGet(rooms.totalPlayers(), Math::max);
-                if (n % 3 != 0) g.disconnected(c, false); // 나가면 대기열 앞사람이 들어옴
+                if (n % 3 != 0) g.disconnected(c, false); // 나가면 대기열 앞사람에게 자리 제안
                 if (n % 5 == 0) g.housekeeping();
+                // 자리 제안을 받은 사람들이 "들어가기"를 누름 (다른 스레드의 사람도)
+                for (Conn o : all) if (o.slotPending()) g.received(o, new ClientMessage.Enter());
                 maxSeen.accumulateAndGet(rooms.totalPlayers(), Math::max);
             });
         }
         start.countDown();
         pool.shutdown();
         assertThat(pool.awaitTermination(30, TimeUnit.SECONDS)).isTrue();
-        g.housekeeping();
+        for (int round = 0; round < 50; round++) {
+            g.housekeeping();
+            for (Conn o : all) if (o.slotPending()) g.received(o, new ClientMessage.Enter());
+        }
 
         assertThat(maxSeen.get()).as("동시에 바다에 있던 최대 인원").isLessThanOrEqualTo(maxTotal);
         assertThat(rooms.totalPlayers()).isLessThanOrEqualTo(maxTotal);

@@ -68,10 +68,15 @@ export type ClientMessage =
   /** 불턱에서 이 자리로 옮겨 앉고 싶음 (서버가 승인하면 seat 방송) */
   | { t: 'seat'; seat: number }
   | { t: 'ping'; ts: number }
+  /** 대기하다 자리가 났다는 slot 을 받고 들어가겠다고 함 */
+  | { t: 'enter' }
 
 // ── 서버 → 클라이언트 ──
 export type ServerMessage =
-  | { t: 'queue'; ahead: number }
+  /** 전체 상한으로 대기 중: 앞사람 수, 예상 대기(초, 모르면 null) */
+  | { t: 'queue'; ahead: number; eta?: number | null }
+  /** 자리가 났어요: ttl(ms) 안에 enter 를 보내면 입장, 아니면 대기열 맨 뒤로 */
+  | { t: 'slot'; ttl: number }
   | {
       t: 'welcome'
       /** p: 서버가 정해 준 시작 위치 (겹치지 않게) */

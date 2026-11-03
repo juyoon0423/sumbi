@@ -89,14 +89,99 @@ class GameServerTest {
     }
 
     @Test
-    void 전체_상한을_넘으면_대기하다가_자리가_나면_입장() {
+    void 전체_상한을_넘으면_대기하다가_자리가_나면_제안_받고_들어가기() {
         GameServer g = server(50, 1);
         FakeClient a = join(g, null);
         FakeClient b = join(g, null);
-        assertThat(b.of(ServerMessage.Queue.class)).containsExactly(new ServerMessage.Queue(0));
+        assertThat(b.of(ServerMessage.Queue.class)).containsExactly(new ServerMessage.Queue(0, null));
         assertThat(b.of(ServerMessage.Welcome.class)).isEmpty();
         g.disconnected(a, false);
+        // 자리가 나면 바로 들어가지 않고 "자리가 났어요" 제안 → 들어가기를 눌러야 입장
+        assertThat(b.of(ServerMessage.Slot.class)).hasSize(1);
+        assertThat(b.of(ServerMessage.Welcome.class)).isEmpty();
+        g.received(b, new ClientMessage.Enter());
         assertThat(b.of(ServerMessage.Welcome.class)).hasSize(1);
+    }
+
+    @Test
+    void 제안_중인_자리는_새로_온_사람이_새치기_못함() {
+        GameServer g = server(50, 1);
+        FakeClient a = join(g, null);
+        FakeClient b = join(g, null);
+        g.disconnected(a, false);
+        FakeClient c = join(g, null);
+        assertThat(c.of(ServerMessage.Welcome.class)).isEmpty();
+        assertThat(c.of(ServerMessage.Queue.class)).isNotEmpty();
+        g.received(b, new ClientMessage.Enter());
+        assertThat(b.of(ServerMessage.Welcome.class)).hasSize(1);
+        assertThat(g.rooms().totalPlayers()).isEqualTo(1);
+    }
+
+    @Test
+    void 제안에_답이_없으면_맨_뒤로_가고_다음_사람에게() {
+        GameServer g = new GameServerTestHelper(this).server(50, 1, 10_000);
+        FakeClient a = join(g, null);
+        FakeClient b = join(g, null);
+        FakeClient c = join(g, null);
+        g.disconnected(a, false);
+        assertThat(b.of(ServerMessage.Slot.class)).hasSize(1);
+        assertThat(c.of(ServerMessage.Slot.class)).isEmpty();
+        now += 11_000;
+        g.housekeeping();
+        // b 는 맨 뒤(앞에 1명), c 가 제안 받음
+        assertThat(c.of(ServerMessage.Slot.class)).hasSize(1);
+        assertThat(b.of(ServerMessage.Queue.class).getLast().ahead()).isEqualTo(0);
+        // 늦게 누른 b 는 들어가지 못하고 순번만 다시
+        g.received(b, new ClientMessage.Enter());
+        assertThat(b.of(ServerMessage.Welcome.class)).isEmpty();
+        g.received(c, new ClientMessage.Enter());
+        assertThat(c.of(ServerMessage.Welcome.class)).hasSize(1);
+    }
+
+    @Test
+    void 상한을_서버를_끄지_않고_올리면_기다리던_사람에게_바로_제안() {
+        GameServer g = server(50, 1);
+        join(g, null);
+        FakeClient b = join(g, null);
+        FakeClient c = join(g, null);
+        assertThat(g.waitingCount()).isEqualTo(2);
+        g.setMaxTotal(3);
+        assertThat(b.of(ServerMessage.Slot.class)).hasSize(1);
+        assertThat(c.of(ServerMessage.Slot.class)).hasSize(1);
+        g.received(b, new ClientMessage.Enter());
+        g.received(c, new ClientMessage.Enter());
+        assertThat(g.rooms().totalPlayers()).isEqualTo(3);
+        // 내리면 이미 들어온 사람은 그대로, 새로 온 사람만 대기
+        g.setMaxTotal(1);
+        FakeClient d = join(g, null);
+        assertThat(d.of(ServerMessage.Queue.class)).isNotEmpty();
+        assertThat(g.rooms().totalPlayers()).isEqualTo(3);
+    }
+
+    @Test
+    void 가득_차거나_대기가_생긴_순간에만_알림() {
+        GameServer g = server(50, 2);
+        List<String> sent = new ArrayList<>();
+        g.setAlerts((key, text) -> sent.add(key));
+        join(g, null);
+        assertThat(sent).isEmpty();
+        join(g, null);
+        assertThat(sent).containsExactly("full");
+        join(g, null);
+        join(g, null);
+        assertThat(sent).containsExactly("full", "queue");
+        g.housekeeping();
+        assertThat(sent).containsExactly("full", "queue");
+        g.setMaxTotal(5);
+        assertThat(sent).contains("cap");
+    }
+
+    @Test
+    void 종료_중엔_새_입장을_받지_않음() {
+        GameServer g = server(50, 100);
+        g.beginShutdown();
+        FakeClient a = join(g, null);
+        assertThat(a.got).isEmpty();
     }
 
     @Test

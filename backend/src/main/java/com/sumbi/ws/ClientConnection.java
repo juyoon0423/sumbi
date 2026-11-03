@@ -80,7 +80,7 @@ public class ClientConnection implements Client {
         if (closed.get()) return;
         long started = sendStartedAt;
         if (started != 0 && clock.getAsLong() - started > limits.sendTimeLimitMs()) {
-            shutdown(true, "send took longer than " + limits.sendTimeLimitMs() + "ms");
+            shutdown(true, "send took longer than " + limits.sendTimeLimitMs() + "ms", CloseStatus.SESSION_NOT_RELIABLE);
             return;
         }
         byte[] bytes;
@@ -91,7 +91,7 @@ public class ClientConnection implements Client {
             return;
         }
         if (queuedBytes.addAndGet(bytes.length) > limits.bufferBytes()) {
-            shutdown(true, "send buffer over " + limits.bufferBytes() + " bytes");
+            shutdown(true, "send buffer over " + limits.bufferBytes() + " bytes", CloseStatus.SESSION_NOT_RELIABLE);
             return;
         }
         queue.add(bytes);
@@ -109,7 +109,7 @@ public class ClientConnection implements Client {
                 } catch (Exception e) {
                     sendStartedAt = 0;
                     draining.set(false);
-                    shutdown(true, "send failed: " + e.getMessage());
+                    shutdown(true, "send failed: " + e.getMessage(), CloseStatus.SESSION_NOT_RELIABLE);
                     return;
                 }
                 sendStartedAt = 0;
@@ -123,19 +123,27 @@ public class ClientConnection implements Client {
 
     @Override
     public void close(boolean abnormal) {
-        shutdown(abnormal, abnormal ? "closed by server (abnormal)" : "closed by server");
+        shutdown(abnormal, abnormal ? "closed by server (abnormal)" : "closed by server",
+            abnormal ? CloseStatus.SESSION_NOT_RELIABLE : CloseStatus.NORMAL);
     }
+
+    /** 서버 재시작(배포): 1012 Service Restart 로 닫음 → 클라이언트가 잠시 뒤 다시 붙음 */
+    public void closeForRestart() {
+        shutdown(true, "server restart", SERVICE_RESTART);
+    }
+
+    /** WebSocket 표준 닫기 코드 1012: 서버가 다시 시작하는 중 */
+    public static final CloseStatus SERVICE_RESTART = new CloseStatus(1012, "server restart");
 
     /**
      * 한 번만: 줄을 비우고, 세션 닫기와 정리 알림은 전송 스레드에서 (방 잠금 안에서 불려도 막히지 않게,
      * 또 닫기가 오래 걸려도 게임 상태 정리는 바로 되게).
      */
-    private void shutdown(boolean abnormal, String reason) {
+    private void shutdown(boolean abnormal, String reason, CloseStatus status) {
         if (!closed.compareAndSet(false, true)) return;
         if (abnormal) log.info("closing {}: {}", session.getId(), reason);
         queue.clear();
         queuedBytes.set(0);
-        CloseStatus status = abnormal ? CloseStatus.SESSION_NOT_RELIABLE : CloseStatus.NORMAL;
         writer.execute(() -> {
             listener.dead(this, abnormal);
             try {

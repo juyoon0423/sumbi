@@ -3,6 +3,7 @@ package com.sumbi.game;
 import com.sumbi.catalog.CustomizeCatalog;
 import com.sumbi.config.SumbiProperties;
 import com.sumbi.admission.AdmissionService;
+import com.sumbi.ops.Alerts;
 import com.sumbi.player.Player;
 import com.sumbi.protocol.ClientMessage;
 import com.sumbi.protocol.LookInfo;
@@ -51,9 +52,23 @@ public class GameServer {
     private final Map<String, Reservation> reservations = new ConcurrentHashMap<>();
     private long todaySentVersion = -1;
     private long todaySentAt;
+    /** 자리 제안(slot)을 기다려 주는 시간 */
+    private final long offerMs;
+    private volatile Alerts alerts = Alerts.NONE;
+    /** 서버 종료 중: 새 입장 받지 않음 */
+    private volatile boolean closing;
+    /** 상한·대기 알림: 상태가 바뀐 순간에만 (같은 상태가 이어지면 다시 안 보냄) */
+    private boolean wasFull;
+    private boolean hadWaiting;
 
     public GameServer(SumbiProperties props, CustomizeCatalog catalog, RoomManager rooms, DailyStats stats,
             LongSupplier clock, RandomGenerator random) {
+        this(props, catalog, rooms, stats, clock, random, 45_000);
+    }
+
+    public GameServer(SumbiProperties props, CustomizeCatalog catalog, RoomManager rooms, DailyStats stats,
+            LongSupplier clock, RandomGenerator random, long offerMs) {
+        this.offerMs = offerMs;
         this.props = props;
         this.catalog = catalog;
         this.rooms = rooms;
@@ -104,6 +119,7 @@ public class GameServer {
             case ClientMessage.Seat seat -> {
                 if (s.player != null) s.room.requestSeat(s.player.id, seat.seat(), now);
             }
+            case ClientMessage.Enter enter -> acceptSlot(c, s);
         }
     }
 
@@ -112,7 +128,7 @@ public class GameServer {
         ClientState s = clients.remove(c);
         admission.remove(c);
         if (s == null || s.player == null) {
-            admitWaiting();
+            offerWaiting();
             return;
         }
         long now = clock.getAsLong();
@@ -125,14 +141,14 @@ public class GameServer {
         } else {
             room.remove(p.id);
             rooms.removeIfEmpty(room);
-            admitWaiting();
+            offerWaiting();
         }
     }
 
     // ── 입장 ──
 
     private synchronized void hello(Client c, ClientState s, ClientMessage.Hello hello) {
-        if (s.player != null || s.pendingHello != null) return; // 이미 입장했거나 대기 중
+        if (s.player != null || s.pendingHello != null || closing) return; // 이미 입장했거나 대기 중, 또는 서버 종료 중
         NickParts nick = catalog.sanitize(hello.nick());
         LookInfo look = catalog.sanitize(hello.look());
         String token = validToken(hello.token()) ? hello.token() : UUID.randomUUID().toString();
@@ -157,7 +173,24 @@ public class GameServer {
             enter(c, s, fixed);
         } else {
             s.pendingHello = fixed;
-            c.send(new ServerMessage.Queue(admission.enqueue(c)));
+            int ahead = admission.enqueue(c);
+            c.send(new ServerMessage.Queue(ahead, admission.etaSeconds(ahead, clock.getAsLong())));
+            log.info("queued (ahead {}, waiting {})", ahead, admission.waitingCount());
+            checkAlerts();
+            offerWaiting();
+        }
+    }
+
+    /** 자리 제안을 받은 사람이 들어오겠다고 함 */
+    private synchronized void acceptSlot(Client c, ClientState s) {
+        if (s.player != null || s.pendingHello == null || closing) return;
+        long now = clock.getAsLong();
+        if (admission.accept(c, now)) {
+            enter(c, s, s.pendingHello);
+        } else {
+            // 제안이 이미 끝났으면 지금 순번을 다시 알려 줌
+            int ahead = admission.position(c);
+            if (ahead >= 0) c.send(new ServerMessage.Queue(ahead, admission.etaSeconds(ahead, now)));
         }
     }
 
@@ -183,6 +216,7 @@ public class GameServer {
         s.pendingHello = null;
         stats.recordDiver(hello.token());
         log.info("joined {} #{} ({}) total={}", s.room.id, p.id, hello.nick().display(), rooms.totalPlayers());
+        checkAlerts();
     }
 
     private ServerMessage welcome(Room room, Player p, TodayStats today) {
@@ -204,12 +238,60 @@ public class GameServer {
         return token != null && token.length() >= 8 && token.length() <= 64 && token.matches("[A-Za-z0-9-]+");
     }
 
-    /** 인원 세기 → 꺼내기 → 입장을 한 잠금 안에서 (동시에 두 번 불려 상한을 넘기지 않게) */
-    private synchronized void admitWaiting() {
-        for (Client c : admission.admit(rooms.totalPlayers())) {
+    /** 인원 세기 → 앞사람에게 자리 제안을 한 잠금 안에서 (동시에 두 번 불려 상한을 넘기지 않게) */
+    private synchronized void offerWaiting() {
+        if (closing) return;
+        for (Client c : admission.offer(rooms.totalPlayers(), clock.getAsLong(), offerMs)) {
             ClientState s = clients.get(c);
-            if (s != null && s.pendingHello != null) enter(c, s, s.pendingHello);
+            if (s == null || s.pendingHello == null) {
+                admission.remove(c);
+                continue;
+            }
+            c.send(new ServerMessage.Slot(offerMs));
+            log.info("slot offered (waiting {})", admission.waitingCount());
         }
+    }
+
+    /** 상한에 닿은 순간·대기가 생긴 순간만 알림 (간격 제한은 Alerts 가) */
+    private synchronized void checkAlerts() {
+        int total = rooms.totalPlayers();
+        int max = admission.maxTotal();
+        boolean full = total >= max;
+        int waitingNow = admission.waitingCount() + admission.offerCount();
+        if (full && !wasFull) alerts.send("full", "🌊 바다가 가득 찼어요: " + total + " / " + max + "명");
+        if (waitingNow > 0 && !hadWaiting) alerts.send("queue", "⏳ 대기 시작: " + waitingNow + "명이 기다려요 (상한 " + max + "명)");
+        wasFull = full;
+        hadWaiting = waitingNow > 0;
+    }
+
+    // ── 운영 ──
+
+    public void setAlerts(Alerts alerts) {
+        this.alerts = alerts == null ? Alerts.NONE : alerts;
+    }
+
+    public int maxTotal() {
+        return admission.maxTotal();
+    }
+
+    /** 전체 상한을 바꿈 (서버를 끄지 않고). 올리면 기다리던 사람에게 바로 자리 제안 */
+    public synchronized void setMaxTotal(int maxTotal) {
+        int before = admission.maxTotal();
+        if (before == maxTotal) return;
+        admission.setMaxTotal(maxTotal);
+        log.info("max total {} -> {}", before, maxTotal);
+        alerts.send("cap", "⚙️ 동시접속 상한 " + before + " → " + maxTotal + "명 (지금 " + rooms.totalPlayers() + "명, 대기 " + admission.waitingCount() + "명)");
+        offerWaiting();
+        checkAlerts();
+    }
+
+    /** 서버 종료 시작: 새 입장·자리 제안을 멈춤 (연결 닫기는 WebSocket 핸들러가) */
+    public void beginShutdown() {
+        closing = true;
+    }
+
+    public boolean isClosing() {
+        return closing;
     }
 
     // ── 주기 작업 ──
@@ -237,8 +319,17 @@ public class GameServer {
             rooms.removeIfEmpty(room);
         }
         reservations.values().removeIf(r -> r.expiresAt() <= now);
-        admitWaiting();
-        for (Client c : admission.waitingList()) c.send(new ServerMessage.Queue(admission.position(c)));
+        synchronized (this) {
+            // 답이 없던 자리 제안은 거두고 맨 뒤로 → 다음 사람에게
+            int expired = admission.expire(now).size();
+            if (expired > 0) log.info("{} slot offer(s) expired, back to queue", expired);
+            offerWaiting();
+            for (Client c : admission.waitingList()) {
+                int ahead = admission.position(c);
+                c.send(new ServerMessage.Queue(ahead, admission.etaSeconds(ahead, now)));
+            }
+            checkAlerts();
+        }
 
         long v = stats.version();
         if (v != todaySentVersion && now - todaySentAt >= props.todayIntervalMs()) {
@@ -256,6 +347,6 @@ public class GameServer {
     }
 
     public int waitingCount() {
-        return admission.waitingCount();
+        return admission.waitingCount() + admission.offerCount();
     }
 }

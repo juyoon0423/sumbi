@@ -4,7 +4,7 @@ import { CONFIG, ITEM_LABEL, withObjectParticle, type ItemType } from '../config
 import { startAct } from '../haenyeo/acts'
 import { sanitizeCustomization } from '../haenyeo/customize'
 import { cameraRig, player } from '../player/runtime'
-import { denyLocalSeat, enterBulteokLocal, returnToSeaLocal, startLocalSeatWalk } from '../player/zone'
+import { denyLocalSeat, enterBulteokLocal, resetForEntry, returnToSeaLocal, startLocalSeatWalk } from '../player/zone'
 import { useBubbles } from '../store/bubbleStore'
 import { useBulteok } from '../store/bulteokStore'
 import { bulteokFx } from '../world/bulteok/bulteokFx'
@@ -15,7 +15,7 @@ import { useSession } from '../store/sessionStore'
 import { useToasts } from '../store/toastStore'
 import { net } from '.'
 import { buildHello } from './hello'
-import type { ServerMessage } from './protocol'
+import type { ServerMessage, Vec3 } from './protocol'
 import { applyEvent, applyPrep, applySeatMove, applySnap, applyZone, remoteNick, remotes, useRemotes } from './remotes'
 
 /** 다른 해녀의 행동 → 토스트 문구. 잠수·상승은 너무 잦아서 알리지 않음 */
@@ -74,6 +74,18 @@ function playRemoteSumbi(id: number) {
   audio.playSumbi({ distance: distance * far + (far > 1 ? 20 : 0), pan: pan * 0.8, pitch: 0.9 + ((id * 37) % 20) / 100 })
 }
 
+/**
+ * 대기하다 들어옴: 혼자 바다에서 어디서 뭘 하고 있었든 화면을 잠깐 가리고 서버가 정해 준 시작 위치 수면으로
+ * (서버의 내 위치와 맞추기 위해. 망사리·일지는 그대로)
+ */
+function enterFromQueue(p: Vec3 | undefined) {
+  useBulteok.getState().setTraveling('sea')
+  window.setTimeout(() => {
+    resetForEntry(p)
+    useToasts.getState().push('바다에 들어왔어요 · 함께하는 해녀들이 보여요')
+  }, 450)
+}
+
 /** 서버(또는 오프라인 흉내) 메시지를 스토어·소리·토스트로 연결 */
 export function useNetBridge() {
   useEffect(() => {
@@ -82,10 +94,25 @@ export function useNetBridge() {
       const game = useGame.getState()
       switch (msg.t) {
         case 'queue':
-          game.setQueueAhead(msg.ahead)
+          // 자리 제안에 답하지 못해 다시 줄 섬
+          if (game.slotUntil !== null) {
+            game.setSlotUntil(null)
+            useToasts.getState().push('자리를 놓쳐서 다시 줄을 섰어요')
+          }
+          game.setQueue({ ahead: msg.ahead, eta: msg.eta ?? null })
+          break
+        case 'slot':
+          game.setSlotUntil(Date.now() + msg.ttl)
+          audio.playChime()
           break
         case 'welcome': {
-          game.setQueueAhead(null)
+          // 대기 중 혼자 하는 바다의 welcome(room 'offline')이 아니라 진짜 서버에 들어온 것
+          const fromQueue = game.queue !== null && msg.room.id !== 'offline'
+          if (msg.room.id !== 'offline') {
+            game.setQueue(null)
+            game.setSlotUntil(null)
+          }
+          if (fromQueue) enterFromQueue(msg.you.p)
           game.setSelf(msg.you.id)
           game.setToday(msg.today)
           useRemotes.getState().reset(msg.players)

@@ -39,6 +39,13 @@ public class SumbiWebSocketHandler extends TextWebSocketHandler implements Clien
             System::currentTimeMillis, this);
         connections.put(session.getId(), c);
         game.connected(c);
+        // 종료 중에 들어온 연결: 바로 "다시 시작 중"으로 닫아 새 서버로 다시 붙게
+        if (game.isClosing()) c.closeForRestart();
+    }
+
+    /** 서버 종료: 모든 연결을 1012(다시 시작 중)로 닫음 */
+    public void closeAllForRestart() {
+        for (ClientConnection c : connections.values()) c.closeForRestart();
     }
 
     @Override

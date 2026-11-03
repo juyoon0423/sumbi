@@ -8,6 +8,9 @@ import { useBubbles } from '../store/bubbleStore'
 import { restingTewak, seatPose } from '../world/bulteok/layout'
 import { beginSeatWalk, startOops } from '../world/bulteok/seatMotion'
 import { walkDuration } from '../world/bulteok/seatWalk'
+import { useFloat } from '../store/floatStore'
+import { stopFloat } from './float'
+import { input, setDiveLatch } from './input'
 import { cameraRig, player } from './runtime'
 
 // 바다 ↔ 불턱 이동: 화면을 부드럽게 가렸다가(페이드) 서버가 자리를 정해 주면 옮기고 다시 밝힘
@@ -59,6 +62,22 @@ export function enterBulteokLocal(seat: number) {
   useBulteok.getState().setZone('bulteok')
   useBulteok.getState().setDozing(false)
   endFade()
+}
+
+/**
+ * 무엇을 하던 중이든(잠수·둥둥·불턱) 수면의 이 자리에서 새로 시작 — 대기하다 서버 바다에 들어갈 때
+ */
+export function resetForEntry(p: Vec3 | undefined) {
+  if (useFloat.getState().active) stopFloat()
+  setDiveLatch(false)
+  input.diveButton = false
+  player.breath = 1
+  player.forcedAscend = false
+  player.diveLock = false
+  player.pose.heldItem = null
+  player.harvestItemId = -1
+  useGame.getState().setDiving(false)
+  returnToSeaLocal(p ?? [0, 0, 8])
 }
 
 /** 불턱에서 바다로: 불턱 아래 바닷가 수면 */

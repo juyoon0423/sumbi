@@ -29,8 +29,10 @@ interface GameState {
   customizing: boolean
   /** 서버 연결 상태 (offline = 혼자 하는 바다) */
   netStatus: NetStatus
-  /** 전체 상한 초과로 대기 중이면 앞사람 수, 아니면 null */
-  queueAhead: number | null
+  /** 전체 상한 초과로 대기 중이면 앞사람 수·예상 대기(초), 아니면 null. 기다리는 동안은 혼자 하는 바다 */
+  queue: { ahead: number; eta: number | null } | null
+  /** 자리가 났어요: 이 시각(Date.now 기준)까지 들어가기를 누르면 입장 */
+  slotUntil: number | null
   basket: ItemCounts
   /** 오늘 불턱에서 손질한 개수 (망사리에서 빠지지 않고 따로 셈) */
   prepped: ItemCounts
@@ -44,7 +46,8 @@ interface GameState {
   setSelf: (id: number) => void
   setCustomizing: (v: boolean) => void
   setNetStatus: (s: NetStatus) => void
-  setQueueAhead: (n: number | null) => void
+  setQueue: (q: { ahead: number; eta: number | null } | null) => void
+  setSlotUntil: (t: number | null) => void
   setToday: (t: TodayStats) => void
   addToBasket: (item: ItemType) => void
   addPrepped: (item: ItemType) => void
@@ -57,7 +60,8 @@ export const useGame = create<GameState>((set, get) => ({
   selfId: null,
   customizing: false,
   netStatus: 'connecting',
-  queueAhead: null,
+  queue: null,
+  slotUntil: null,
   basket: loadBasket(),
   prepped: loadBasket(PREPPED_KEY),
   today: null,
@@ -70,7 +74,8 @@ export const useGame = create<GameState>((set, get) => ({
   setNetStatus: (netStatus) => {
     if (get().netStatus !== netStatus) set({ netStatus })
   },
-  setQueueAhead: (queueAhead) => set({ queueAhead }),
+  setQueue: (queue) => set({ queue }),
+  setSlotUntil: (slotUntil) => set({ slotUntil }),
   setToday: (today) => set({ today }),
   addToBasket: (item) => {
     const basket = { ...get().basket, [item]: get().basket[item] + 1 }

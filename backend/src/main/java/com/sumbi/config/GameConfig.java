@@ -2,6 +2,9 @@ package com.sumbi.config;
 
 import com.sumbi.catalog.CustomizeCatalog;
 import com.sumbi.game.GameServer;
+import com.sumbi.ops.Alerts;
+import com.sumbi.ops.CapacitySource;
+import com.sumbi.ops.WebhookAlerts;
 import com.sumbi.room.MovementValidator;
 import com.sumbi.room.PrepLedger;
 import com.sumbi.room.Room;
@@ -15,7 +18,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.random.RandomGenerator;
+import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -67,8 +70,52 @@ public class GameConfig {
     }
 
     @Bean
-    public GameServer gameServer(SumbiProperties props, CustomizeCatalog catalog, RoomManager rooms, DailyStats stats) {
-        return new GameServer(props, catalog, rooms, stats, System::currentTimeMillis, RandomGenerator.getDefault());
+    public GameServer gameServer(SumbiProperties props, OpsProperties ops, CustomizeCatalog catalog, RoomManager rooms,
+            DailyStats stats, Alerts alerts) {
+        GameServer g = new GameServer(props, catalog, rooms, stats, System::currentTimeMillis, ThreadLocalRandom.current(),
+            ops.slotOfferMs());
+        g.setAlerts(alerts);
+        return g;
+    }
+
+    /** 휴대폰 알림: 웹훅 주소가 있을 때만 */
+    @Bean
+    public Alerts alerts(OpsProperties ops) {
+        String url = ops.alertWebhookUrl();
+        if (url == null || url.isBlank()) {
+            log.info("알림: 꺼짐 (SUMBI_ALERT_WEBHOOK_URL 없음)");
+            return Alerts.NONE;
+        }
+        log.info("알림: 켜짐 ({})", url.contains("telegram") ? "텔레그램" : "디스코드");
+        return new WebhookAlerts(url, ops.alertTelegramChat(), ops.alertName() + " ", ops.alertMinIntervalMs(),
+            System::currentTimeMillis, Executors.newVirtualThreadPerTaskExecutor());
+    }
+
+    /**
+     * 동시접속 상한을 서버를 끄지 않고 바꾸기: 몇 초마다 Redis 키(sumbi:config:max-total)를 읽어 반영.
+     * 키가 없으면 SUMBI_MAX_TOTAL 기본값. Redis 가 멈추면 마지막 값 유지. 게임 틱과 다른 스레드 (Redis 대기가 틱을 막지 않게)
+     */
+    @Bean(destroyMethod = "shutdownNow")
+    public ScheduledExecutorService capacityPoller(GameServer game, SumbiProperties props, OpsProperties ops,
+            ObjectProvider<StringRedisTemplate> redis, Alerts alerts) {
+        ScheduledExecutorService ex = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "sumbi-capacity");
+            t.setDaemon(true);
+            return t;
+        });
+        StringRedisTemplate template = redis.getIfAvailable();
+        log.info("동시접속 상한: 기본 {}명{}", props.maxTotal(), template == null ? "" : " (Redis " + CapacitySource.KEY + " 로 바꿀 수 있음)");
+        alerts.send("start", "🟢 서버 시작 (동시접속 상한 " + props.maxTotal() + "명, Redis 값이 있으면 그 값)");
+        if (template == null) return ex;
+        CapacitySource source = new CapacitySource(template);
+        ex.scheduleWithFixedDelay(() -> {
+            try {
+                game.setMaxTotal(source.read().orElse(props.maxTotal()));
+            } catch (RuntimeException e) {
+                log.debug("capacity read failed: {}", e.getMessage());
+            }
+        }, 0, ops.capPollMs(), TimeUnit.MILLISECONDS);
+        return ex;
     }
 
     /** 연결별 전송 스레드 (가상 스레드: 느린 연결이 막혀도 다른 연결·방에 영향 없음) */
