@@ -18,7 +18,8 @@ cd frontend && npm run build && npm run lint  # 타입 검사 + 빌드, oxlint
 
 - 환경변수·설정은 README "로컬 실행" 참고 (`SUMBI_*`, `VITE_WS_URL`). 서버가 없으면 프론트는 혼자 하는 바다로 자동 전환.
 - `./dev.sh` 는 Redis 가 설치돼 있으면 함께 띄움(`.redis/`, 커밋 안 함), 없으면 메모리 집계. Ctrl+C 로 전부 종료.
-- 개발용: `/dev/character` (캐릭터 랩), 브라우저 콘솔 `window.__sumbi` (플레이어·카메라·해산물·원격 해녀·게임 스토어·불턱·`setTime('night')`·`float.start()`·`gulls()`·`shootingStar()`), 시간대 고정 `?time=dawn|day|sunset|night` 또는 `?hour=5.6`
+- 개발용: `/dev/character` (캐릭터 랩), 브라우저 콘솔 `window.__sumbi` (플레이어·카메라·해산물·원격 해녀·게임 스토어·불턱·`setTime('night')`·`float.start()`·`gulls()`·`shootingStar()`), 시간대 고정 `?time=dawn|day|sunset|night` 또는 `?hour=5.6`, `?quality=high|medium|low`, `?debug=1` (fps·품질 표시)
+- 휴대폰 확인: 같은 와이파이에서 `./dev.sh` 가 찍어 주는 `http://<내부 IP>:5173/?debug=1`
 - 백엔드를 끄고 켤 때 `lsof -ti tcp:8080 -sTCP:LISTEN` 으로 서버 프로세스만 고를 것 (그냥 `tcp:8080` 은 연결된 브라우저까지 잡음)
 
 ## 작업 규칙

@@ -1,6 +1,7 @@
 import { Canvas } from '@react-three/fiber'
 import { Suspense } from 'react'
 import { NeutralToneMapping } from 'three'
+import { debugOn } from '../lib/debug'
 import { QUALITY, useQuality } from '../lib/quality'
 import { Effects, FrameGuard } from '../world/Effects'
 import { JournalCamera } from '../journal/JournalCamera'
@@ -8,6 +9,7 @@ import { FollowCamera } from '../player/FollowCamera'
 import { LocalPlayer } from '../player/LocalPlayer'
 import { RemotePlayers } from '../world/remote/RemotePlayers'
 import { useGame } from '../store/gameStore'
+import { DebugOverlay } from '../ui/DebugOverlay'
 import { Hud } from '../ui/Hud'
 import { SeaScene } from '../world/sea/SeaScene'
 import { EntryScreen } from './EntryScreen'
@@ -34,6 +36,7 @@ export function GameScreen() {
         </Suspense>
       </Canvas>
       {phase === 'entry' ? <EntryScreen /> : <Hud />}
+      {debugOn && <DebugOverlay />}
     </div>
   )
 }

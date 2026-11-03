@@ -290,3 +290,11 @@
 ### `capture-journal.mjs` "함께한 해녀" 실패
 - 같은 백엔드(:8080)에 사용자 Chrome 같은 다른 브라우저가 붙어 있으면 함께한 해녀 수가 늘어남. 다른 연결을 닫고 다시 돌림 (`lsof -i tcp:8080` 으로 확인).
 
+## 휴대폰으로 개발 서버 보기 (2026-11-04)
+
+### 휴대폰에서 페이지가 안 열림
+- Vite 는 기본으로 localhost 에만 열림 → `npm run dev -- --host` (`dev.sh` 가 함). Mac 과 휴대폰이 같은 와이파이인지, macOS 방화벽이 node 들어오는 연결을 막지 않는지 확인. 내부 IP 는 `ipconfig getifaddr en0`.
+
+### 페이지는 열리는데 혼자 하는 바다로 바뀜
+- WebSocket 주소는 개발 모드에서 `location.hostname` 을 따라가므로 IP 로 열면 `ws://<IP>:8080/ws`. 서버가 origin `http://<IP>:5173` 을 거절하면(403) 연결 실패 → `dev.sh` 로 켰는지(허용 origin 에 내부 IP 추가), 와이파이가 바뀌어 IP 가 달라졌으면 서버를 다시 켬. 확인: `curl -H "Origin: http://<IP>:5173" -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" http://<IP>:8080/ws` → 101 이면 허용.
+

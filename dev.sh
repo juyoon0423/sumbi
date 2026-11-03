@@ -7,6 +7,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 WHAT="${1:-all}"
 
+# 같은 와이파이의 휴대폰에서 열 수 있게: Mac 의 내부 IP (없으면 비움)
+LAN_IP="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)"
+# 개발 때만 내부 IP 주소에서 온 접속도 허용 (배포는 SUMBI_ALLOWED_ORIGINS 를 직접 넣으므로 영향 없음)
+if [[ -z "${SUMBI_ALLOWED_ORIGINS:-}" ]]; then
+  SUMBI_ALLOWED_ORIGINS="http://localhost:*,http://127.0.0.1:*"
+  [[ -n "$LAN_IP" ]] && SUMBI_ALLOWED_ORIGINS+=",http://$LAN_IP:*"
+  export SUMBI_ALLOWED_ORIGINS
+fi
+
 # 끝낼 때 이 스크립트가 띄운 프로세스 전부 정리
 trap 'trap - EXIT INT TERM; kill 0 2>/dev/null || true' EXIT INT TERM
 
@@ -56,7 +65,11 @@ start_frontend() {
   echo "▶ 프론트 시작 (http://localhost:5173)"
   cd "$ROOT/frontend"
   [[ -d node_modules ]] || npm install
-  npm run dev &
+  # --host: 같은 네트워크의 다른 기기(휴대폰)에서도 접속 가능
+  npm run dev -- --host &
+  if [[ -n "$LAN_IP" ]]; then
+    echo "📱 휴대폰(같은 와이파이): http://$LAN_IP:5173/?debug=1   (WebSocket 은 ws://$LAN_IP:8080/ws 로 자동)"
+  fi
 }
 
 case "$WHAT" in
