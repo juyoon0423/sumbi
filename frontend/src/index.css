@@ -1203,11 +1203,8 @@ body.float-calm .tag-stack {
 }
 /* 안내·알림 문구는 왼쪽 위 카드들 아래 */
 .hud.touch .top-center {
-  top: calc(150px + env(safe-area-inset-top));
+  top: calc(160px + env(safe-area-inset-top));
   width: calc(100% - 24px);
-}
-body.today-open .hud.touch .top-center {
-  top: calc(178px + env(safe-area-inset-top));
 }
 .hud.touch.in-bulteok .top-center {
   top: calc(172px + env(safe-area-inset-top));
@@ -1219,6 +1216,17 @@ body.today-open .hud.touch .top-center {
 }
 .hud.touch .bottom-center {
   bottom: calc(14px + env(safe-area-inset-bottom));
+}
+/* 바다: 아래쪽은 조이스틱·버튼 자리라 숨 게이지는 위쪽 (망사리·오늘의 바다 밑) */
+.hud.touch:not(.in-bulteok) .bottom-center {
+  bottom: auto;
+  top: calc(122px + env(safe-area-inset-top));
+}
+body.today-open .hud.touch:not(.in-bulteok) .bottom-center {
+  top: calc(176px + env(safe-area-inset-top));
+}
+body.today-open .hud.touch .top-center {
+  top: calc(214px + env(safe-area-inset-top));
 }
 /* 오른쪽 아래 세로 행동 버튼 (잠수가 맨 아래, 엄지 가까이) */
 .bottom-right {

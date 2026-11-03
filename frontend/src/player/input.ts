@@ -1,4 +1,15 @@
-// 키보드·화면 버튼(·5단계의 조이스틱) 입력을 한곳에 모은다.
+import { create } from 'zustand'
+
+// 키보드·화면 버튼·터치 조이스틱 입력을 한곳에 모은다.
+
+/**
+ * 잠수 버튼을 한 번 톡 누르면 계속 잠수 (다시 누르면 올라감). 휴대폰에서 엄지 하나로 조이스틱만 쥐어도 되게.
+ * 누르고 있다가 떼는 방식(Space 와 같음)도 그대로 됨. 숨이 다하거나 수면에 오르면 풀림.
+ */
+export const useDiveLatch = create<{ on: boolean }>(() => ({ on: false }))
+export const setDiveLatch = (on: boolean) => {
+  if (useDiveLatch.getState().on !== on) useDiveLatch.setState({ on })
+}
 
 /** 지금 눌려 있는 키 (event.code) */
 export const keys = new Set<string>()
@@ -43,7 +54,7 @@ export function readMove(): { x: number; y: number } {
 }
 
 export function isDiveHeld() {
-  return keys.has('Space') || input.diveButton
+  return keys.has('Space') || input.diveButton || useDiveLatch.getState().on
 }
 
 export function consumeWave() {
@@ -69,6 +80,8 @@ export function attachKeyboard() {
   const clear = () => {
     keys.clear()
     input.diveButton = false
+    input.stick.x = 0
+    input.stick.y = 0
   }
   window.addEventListener('keydown', down)
   window.addEventListener('keyup', up)

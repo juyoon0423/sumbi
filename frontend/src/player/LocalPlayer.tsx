@@ -24,7 +24,7 @@ import { waveHeight } from '../world/sea/waves'
 import { collect, findHarvestable, seafood } from '../world/sea/seafood/seafoodState'
 import { onActEvent } from './actEvents'
 import { FLOAT_UP, floatState, stopFloat } from './float'
-import { attachKeyboard, consumeWave, isDiveHeld, readMove } from './input'
+import { attachKeyboard, consumeWave, isDiveHeld, readMove, setDiveLatch } from './input'
 import { cameraRig, fx, player } from './runtime'
 
 const tmp = new Vector3()
@@ -169,6 +169,7 @@ export function LocalPlayer() {
       if (p.breath <= 0 && !p.forcedAscend) {
         p.forcedAscend = true
         p.diveLock = true
+        setDiveLatch(false)
         if (pose.state === 'harvesting') {
           p.harvestItemId = -1
           pose.heldItem = null
@@ -346,6 +347,7 @@ function arriveSurface(t: number) {
   const p = player
   const dived = t - p.diveStartedAt
   p.forcedAscend = false
+  setDiveLatch(false)
   p.tewak.attached = true
   useGame.getState().setDiving(false)
   fx.splashes.push({ pos: p.pos.clone(), power: 1.2 })

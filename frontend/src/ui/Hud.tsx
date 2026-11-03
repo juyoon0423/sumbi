@@ -9,7 +9,7 @@ import { JournalButton, JournalOverlay } from './JournalCard'
 import { Joystick } from './Joystick'
 import { startAct } from '../haenyeo/acts'
 import { stopFloat, toggleFloat } from '../player/float'
-import { input } from '../player/input'
+import { input, setDiveLatch, useDiveLatch } from '../player/input'
 import { player } from '../player/runtime'
 import { travel } from '../player/zone'
 import { useBubbles } from '../store/bubbleStore'
@@ -32,7 +32,7 @@ function HintPill() {
     <div className={`pill hint ${show ? '' : 'hidden'}`}>
       {touchUI ? (
         <>
-          왼쪽 아래를 끌어 헤엄치고, <b>🤿</b>를 누르고 있으면 잠수해요 · 화면을 끌어 둘러봐요
+          왼쪽 아래를 끌어 헤엄치고, <b>🤿</b>를 톡 누르면 잠수해요 · 화면을 끌어 둘러보고, 두 손가락으로 벌려 가까이
         </>
       ) : (
         <>
@@ -196,12 +196,37 @@ function FloatCalm() {
 
 const CALM_AFTER_MS = 4500
 
+/** 이보다 짧게 누르면 '톡' (계속 잠수) */
+const TAP_MS = 280
+
 /** 하단 가운데: 행동 바 (레퍼런스 산사) */
 function ActionBar() {
   const diving = useGame((s) => s.diving)
   const floating = useFloat((s) => s.active)
-  const holdDive = (v: boolean) => () => {
-    input.diveButton = v
+  const latched = useDiveLatch((s) => s.on)
+  // 톡 누르면 계속 잠수(다시 톡 → 올라가기), 누르고 있다 떼면 바로 올라감
+  const press = useRef({ at: 0, release: false })
+  const diveDown = () => {
+    if (useDiveLatch.getState().on) {
+      setDiveLatch(false)
+      press.current.release = true
+      return
+    }
+    press.current = { at: performance.now(), release: false }
+    input.diveButton = true
+  }
+  const diveUp = () => {
+    if (press.current.release) {
+      press.current.release = false
+      return
+    }
+    if (!input.diveButton) return
+    input.diveButton = false
+    const tap = performance.now() - press.current.at < TAP_MS
+    if (tap && useGame.getState().diving && player.pose.state !== 'ascending') setDiveLatch(true)
+  }
+  const diveCancel = () => {
+    input.diveButton = false
   }
   // F: 둥둥 눕기/일어나기
   useEffect(() => {
@@ -217,15 +242,16 @@ function ActionBar() {
     <div className="glass actionbar">
       <button
         className={`action ${diving ? 'active' : ''}`}
-        onPointerDown={holdDive(true)}
-        onPointerUp={holdDive(false)}
-        onPointerLeave={holdDive(false)}
-        onPointerCancel={holdDive(false)}
+        title="톡 누르면 계속 잠수, 다시 누르면 올라가요 · 누르고 있다 떼도 돼요"
+        onPointerDown={diveDown}
+        onPointerUp={diveUp}
+        onPointerLeave={diveUp}
+        onPointerCancel={diveCancel}
         onContextMenu={(e) => e.preventDefault()}
       >
-        <span className="icon">🤿</span>
-        <span>{diving ? '잠수 중' : '잠수'}</span>
-        <kbd>Space 누르기</kbd>
+        <span className="icon">{latched ? '⬆️' : '🤿'}</span>
+        <span>{latched ? '올라가기' : diving ? '잠수 중' : '잠수'}</span>
+        <kbd>{latched ? '다시 톡' : 'Space 누르기'}</kbd>
       </button>
       <button className="action" onClick={() => (input.waveRequested = true)}>
         <span className="icon">👋</span>

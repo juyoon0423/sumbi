@@ -44,11 +44,36 @@ export function FollowCamera() {
     const el = gl.domElement
     el.style.touchAction = 'none'
     const unblock = blockNativeTouch(el)
+    // 손가락(포인터)들: 하나면 둘러보기, 둘이면 벌리고 좁혀 줌 (휴대폰)
+    const pts = new Map<number, { x: number; y: number }>()
+    let pinch = 0
+    const spread = () => {
+      const [a, b] = [...pts.values()]
+      return Math.hypot(a.x - b.x, a.y - b.y)
+    }
     const down = (e: PointerEvent) => {
-      drag.current = { x: e.clientX, y: e.clientY, id: e.pointerId }
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY })
       el.setPointerCapture(e.pointerId)
+      if (pts.size === 2) {
+        // 두 번째 손가락: 둘러보기를 멈추고 줌 시작
+        drag.current = null
+        pinch = spread()
+      } else if (pts.size === 1) {
+        drag.current = { x: e.clientX, y: e.clientY, id: e.pointerId }
+      }
     }
     const move = (e: PointerEvent) => {
+      const pt = pts.get(e.pointerId)
+      if (pt) {
+        pt.x = e.clientX
+        pt.y = e.clientY
+      }
+      if (pts.size === 2 && pt) {
+        const d = spread()
+        if (pinch > 10 && d > 10) zoomBy(pinch / d)
+        pinch = d
+        return
+      }
       const d = drag.current
       if (!d || d.id !== e.pointerId) return
       if (useFloat.getState().active) {
@@ -67,7 +92,22 @@ export function FollowCamera() {
       cameraRig.lastDragAt = performance.now()
     }
     const up = (e: PointerEvent) => {
+      pts.delete(e.pointerId)
       if (drag.current?.id === e.pointerId) drag.current = null
+      // 줌하다 한 손가락만 남으면 그 손가락으로 이어서 둘러보기 (튀지 않게 지금 자리부터)
+      if (pts.size === 1 && !drag.current) {
+        const [[id, p]] = [...pts.entries()]
+        drag.current = { x: p.x, y: p.y, id }
+      }
+    }
+    /** 줌: k > 1 이면 멀어짐 */
+    const zoomBy = (k: number) => {
+      if (useFloat.getState().active) {
+        floatCam.fov = clamp(floatCam.fov * k, 36, 78)
+        floatCam.lastInput = performance.now()
+        return
+      }
+      cameraRig.distance = clamp(cameraRig.distance * k, 3, 10)
     }
     const wheel = (e: WheelEvent) => {
       if (useFloat.getState().active) {

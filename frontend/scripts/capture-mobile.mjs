@@ -50,7 +50,7 @@ const shot = (page, f) => page.screenshot({ path: join(out, `${f}.jpg`), type: '
 /** 화면 요소끼리 겹치는지 (보이는 HUD 상자) */
 const overlaps = (page) =>
   page.evaluate(() => {
-    const sel = ['.basket', '.today', '.basin-card', '.top-right', '.bottom-right .actionbar', '.bulteok-bar .prep-panel', '.bulteok-bar .actionbar', '.joy-base', '.hint:not(.hidden)', '.toast', 'div[style*="monospace"]']
+    const sel = ['.basket', '.today', '.basin-card', '.top-right', '.bottom-right .actionbar', '.bulteok-bar .prep-panel', '.bulteok-bar .actionbar', '.joy-base', '.hint:not(.hidden)', '.toast', '.breath:not(.hidden)', 'div[style*="monospace"]']
     const boxes = []
     for (const s of sel)
       for (const el of document.querySelectorAll(s)) {
@@ -130,6 +130,54 @@ console.log('▶ 세로 휴대폰 · 바다')
   check(Math.hypot(q1.x - q0.x, q1.z - q0.z) > 0.5, '물속에서 잠수 버튼 + 조이스틱 함께')
   await page.waitForFunction(() => window.__sumbi.player.pose.state === 'surfaceIdle', null, { timeout: 20000 }).catch(() => {})
 
+  // 톡 누르면 계속 잠수 → 손을 떼도 내려가 있음 → 다시 톡 하면 올라감
+  await page.waitForFunction(() => window.__sumbi.player.pose.state === 'surfaceIdle', null, { timeout: 20000 }).catch(() => {})
+  await wait(400)
+  await touch(cdp, 'touchStart', [{ id: 5, ...c }])
+  await wait(120)
+  await touch(cdp, 'touchEnd', [])
+  await wait(3000)
+  const latched = await page.evaluate(() => [window.__sumbi.player.pose.state, window.__sumbi.player.pos.y])
+  const label = await page.locator('.bottom-right .action').first().innerText()
+  await shot(page, 'sea-dive-latched')
+  const od = await overlaps(page)
+  check(od.hits.length === 0, `잠수 중 숨 게이지 겹침 없음 ${od.hits.join(', ')}`)
+  check(latched[1] < -1 && latched[0] !== 'ascending', `톡 → 손 떼도 계속 잠수 (${latched[0]}, y ${latched[1].toFixed(2)})`)
+  check(label.includes('올라가기'), `잠수 버튼이 "올라가기"로 (${label.replace(/\n/g, ' ')})`)
+  // 엄지 하나로 조이스틱만 쥐고 물속 헤엄
+  const l0 = await page.evaluate(() => ({ ...window.__sumbi.player.pos }))
+  await drag(cdp, { x: 90, y: 740 }, { x: 90, y: 690 }, 6, 1000)
+  const l1 = await page.evaluate(() => ({ ...window.__sumbi.player.pos }))
+  check(Math.hypot(l1.x - l0.x, l1.z - l0.z) > 0.5, '잠수한 채 조이스틱만으로 헤엄')
+  await touch(cdp, 'touchStart', [{ id: 6, ...c }])
+  await wait(100)
+  await touch(cdp, 'touchEnd', [])
+  await wait(500)
+  check(await page.evaluate(() => window.__sumbi.player.pose.state === 'ascending'), '다시 톡 → 올라가기')
+  await page.waitForFunction(() => window.__sumbi.player.pose.state === 'surfaceIdle', null, { timeout: 20000 }).catch(() => {})
+  check(!(await page.locator('.bottom-right .action').first().innerText()).includes('올라가기'), '수면에 오르면 잠수 버튼 원래대로')
+
+  // 두 손가락으로 벌리기 → 가까이, 좁히기 → 멀리
+  const pinchTo = async (from, to) => {
+    await touch(cdp, 'touchStart', [{ id: 7, x: 195 - from, y: 420 }])
+    await touch(cdp, 'touchStart', [{ id: 7, x: 195 - from, y: 420 }, { id: 8, x: 195 + from, y: 440 }])
+    for (let i = 1; i <= 10; i++) {
+      const d = from + ((to - from) * i) / 10
+      await touch(cdp, 'touchMove', [{ id: 7, x: 195 - d, y: 420 }, { id: 8, x: 195 + d, y: 440 }])
+      await wait(16)
+    }
+    await touch(cdp, 'touchEnd', [])
+  }
+  const z0 = await page.evaluate(() => [window.__sumbi.cameraRig.distance, window.__sumbi.cameraRig.yaw])
+  await pinchTo(40, 110)
+  const z1 = await page.evaluate(() => [window.__sumbi.cameraRig.distance, window.__sumbi.cameraRig.yaw])
+  await shot(page, 'sea-pinch-in')
+  await pinchTo(110, 30)
+  const z2 = await page.evaluate(() => window.__sumbi.cameraRig.distance)
+  check(z1[0] < z0[0] - 0.8, `벌리면 가까이 (거리 ${z0[0].toFixed(2)} → ${z1[0].toFixed(2)})`)
+  check(z2 > z1[0] + 0.8, `좁히면 멀리 (거리 → ${z2.toFixed(2)})`)
+  check(Math.abs(z1[1] - z0[1]) < 0.05, '줌하는 동안 시점은 안 돌아감')
+
   // 오늘의 바다 펼치기
   await page.locator('.today').tap()
   await wait(300)
@@ -141,6 +189,10 @@ console.log('▶ 세로 휴대폰 · 바다')
   await page.locator('.bottom-right .action', { hasText: '둥둥' }).tap()
   await wait(2500)
   await shot(page, 'float')
+  const f0 = await page.evaluate(() => window.__sumbi.float.cam.fov)
+  await pinchTo(40, 100)
+  const f1 = await page.evaluate(() => window.__sumbi.float.cam.fov)
+  check(f1 < f0 - 4, `둥둥에서 벌리면 하늘을 가까이 (fov ${f0.toFixed(0)} → ${f1.toFixed(0)})`)
   await drag(cdp, { x: 90, y: 740 }, { x: 90, y: 690 }, 6, 600)
   await wait(400)
   check(await page.evaluate(() => !window.__sumbi.float.cam || window.__sumbi.player.pose.state !== 'float'), '둥둥 중 조이스틱으로 일어나기')
