@@ -1,7 +1,7 @@
 # 진행 현황
 
 > 새 세션은 이 파일부터 읽는다. 작업이 끝나면 갱신하고 같은 커밋에 넣는다.
-> 마지막 갱신: 2026-11-11 (저장소 공개 준비: 민감 정보 점검·README 새로 씀. **다음 세션은 배포 2단계부터** — 아래 "다음 할 일" 1번)
+> 마지막 갱신: 2026-11-11 (저장소 공개: 민감 정보 점검·README 새로 씀·public 전환·CI ARM 러너. **다음 세션은 배포 2단계부터** — 아래 "다음 할 일" 1번)
 
 ## 지난 작업 요약 (2026-11-02 ~ 11-03)
 
@@ -15,7 +15,7 @@
 - **11-04**: 둥둥 구도 조금 더 하늘 위주(테왁이 얼굴을 가리지 않게) → **하늘·바다 v2**(배경만 사실적으로, 캐릭터는 그대로): 산란 흉내 하늘·부피감 구름·별 등급/색·은하수 먼지띠·실제 달 위상 / 잔물결 노멀맵·프레넬 반사·햇빛 반짝임·노을빛 길·달빛 길·해안 옥빛·포말·먼 흰 파도 / 구멍 숭숭 현무암·젖은 바위·뿌연 산 / 물속 깊이별 색·떠다니는 입자·수면 너머 하늘 / 원격 해녀도 같은 파도 높이·둘레 물결 / 톤 매핑·블룸 / 품질 단계(높음·보통·낮음, 자동 낮춤)
 - **11-04 (오후)**: 휴대폰 조작(조이스틱·세로 버튼·두 손가락 줌·톡 잠수) → 배포 계획(`deploy-plan.md`) → **배포 1단계**: Docker 이미지(arm64)·운영 compose(nginx + blue/green + redis)·무중단 배포 스크립트·**1012 재접속 신호**·**동시접속 상한 20(Redis 로 바로 바꿈)·대기 화면(혼자 바다에서 놀며 대기 → "바다에 자리가 났어요")·휴대폰 알림**·GitHub Actions(테스트·arm64 이미지·배포 버튼·상한 버튼)·`docs/deploy.md`(준비할 것 버튼 단위). 로컬 Docker 로 운영 구성 확인까지. **실제 배포(2단계)는 하지 않음**
 - **11-04 (저녁)**: 배포 전 마지막 기능 **바다 친구들** — 물속 생물(자리돔 떼·따라오는 물고기·한치·문어·게·소라게·불가사리·해파리), 바다거북(내 화면, 가끔), **남방큰돌고래 무리**(서버가 바다마다 정해 모두에게 같은 순간, `dolphin` 메시지, 오늘 N번 집계). 브라우저 3개로 같은 순간 확인, 휴대폰 fps 전후 차이 없음
-- **11-11**: 저장소 public 전환 준비 — 현재 파일·git 히스토리 전체에서 비밀 점검(키·토큰·웹훅·`.env`·인증서·AWS 계정/인스턴스 ID·내부 IP·개인 경로·전화번호 없음, 예시 파일은 빈 값/자리표시자만). README 를 소개·스크린샷 중심으로 새로 씀, 현재 그래픽으로 시간대 사진을 다시 찍어 `docs/screenshots/readme/` 에 둠. 저작권 한 줄, 공개 전환 순서(deploy.md), ARM 러너 변경 계획 정리
+- **11-11**: 저장소 public 전환 준비 — 현재 파일·git 히스토리 전체에서 비밀 점검(키·토큰·웹훅·`.env`·인증서·AWS 계정/인스턴스 ID·내부 IP·개인 경로·전화번호 없음, 예시 파일은 빈 값/자리표시자만). README 를 소개·스크린샷 중심으로 새로 씀, 현재 그래픽으로 시간대 사진을 다시 찍어 `docs/screenshots/readme/` 에 둠. 저작권 한 줄, 공개 전환 순서(deploy.md). 사용자가 public 으로 전환 → CI 이미지 작업을 ARM 러너로
 - 미완성 작업: **없음**. 모두 `main` 에 커밋·push. `wip/` 브랜치 없음.
 
 ## 단계별 진행
@@ -125,15 +125,8 @@
 
 ### 배포 전에 사용자가 직접 해야 할 일
 - [ ] **[docs/deploy.md](deploy.md) "준비할 것" 0~9** (도메인 → Cloudflare → AWS 계정 지키기 → EC2 t4g.small(서울, Arm, 키 없이 SSM) → GitHub OIDC 역할 → Vercel(Production 에만 `VITE_WS_URL`) → 서버 준비(읽기 전용 배포 키·GHCR 읽기 토큰·`backend.env`·Origin 인증서) → 디스코드 웹훅 → GitHub `production` 환경 변수 3개)
-- [ ] **저장소 공개 전환** — 비밀 점검은 끝남(11-11). 순서·설정은 [deploy.md](deploy.md) "공개로 바꾸기" (noreply 이메일 → Make public → Actions·Environment·Ruleset·Secret scanning)
-
-### 저장소 공개 뒤 (사용자가 "공개 전환 끝" 이라고 하면)
-- [ ] **`ci.yml` 이미지 작업을 ARM 러너로** (공개 저장소는 `ubuntu-24.04-arm` 무료). `image` 작업만:
-  - `runs-on: ubuntu-latest` → `runs-on: ubuntu-24.04-arm`
-  - `docker/setup-qemu-action@v3` 단계(와 `with: platforms: arm64`) 삭제 · 위 주석 "private 이라 QEMU…" 를 "공개 저장소라 ARM 러너에서 바로 arm64 로 빌드" 로
-  - 그대로 둘 것: `setup-buildx-action`, `platforms: linux/arm64`, GHA 캐시, 태그. `backend/Dockerfile` 은 `FROM --platform=$BUILDPLATFORM` 이라 고칠 것 없음 (빌드 단계도 arm64 로 바로 돔)
-  - `backend`·`frontend` 테스트 작업은 `ubuntu-latest` 그대로
-  - 확인: push → CI 초록 → `docker buildx imagetools inspect ghcr.io/juyoon0423/sumbi-backend:main` 에 `linux/arm64`, 빌드 시간 비교 → `deploy.md`·progress 의 "QEMU" 언급 고치기
+- [x] **저장소 공개 전환** (11-11, 사용자) — noreply 이메일 설정됨. 남은 GitHub 설정: [deploy.md](deploy.md) "공개로 바꾸기" 3~7 (Actions 외부 PR 승인·Ruleset·Secret scanning/Push protection 등 — 11-11 기준 Ruleset 없음, Secret scanning 꺼짐)
+- [x] **`ci.yml` 이미지 작업을 ARM 러너로** (11-11): `ubuntu-24.04-arm`, QEMU 단계 삭제. 테스트 작업은 `ubuntu-latest` 그대로. Dockerfile 은 `$BUILDPLATFORM` 이라 그대로
 
 ## 결정 기록
 

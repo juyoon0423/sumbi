@@ -60,7 +60,8 @@ jobs:
     name: 백엔드 이미지 (arm64 → GHCR)
     needs: [backend, frontend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    # 공개 저장소라 ARM 러너에서 바로 arm64 로 빌드 (에뮬레이션 없음)
+    runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
       packages: write
@@ -71,11 +72,6 @@ jobs:
         run: |
           echo "short=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/sumbi-backend" >> "$GITHUB_OUTPUT"
-      # 저장소가 private 이라 ARM 러너 대신 QEMU + buildx. Dockerfile 의 빌드 단계는 x86 에서 그대로 돌고
-      # 마지막 단계엔 RUN 이 없어서 에뮬레이션이 거의 필요 없음
-      - uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:

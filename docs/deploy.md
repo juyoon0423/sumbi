@@ -40,7 +40,7 @@
 | `deploy/.env.example` → 서버 `deploy/.env` | 이미지 주소 + 지금 쓰는 색·태그 (deploy.sh 가 관리) |
 | `deploy/backend.env.example` → 서버 `deploy/backend.env` | **비밀**: 프론트 주소, 상한, 알림 웹훅. 저장소에 넣지 않음 (`.gitignore`) |
 | `deploy/aws/` | EC2 사용자 데이터, 보안 그룹 스크립트, GitHub 용 IAM 정책 |
-| `.github/workflows/ci.yml` | push 마다 백엔드 테스트·프론트 빌드/린트, main 이면 arm64 이미지 → GHCR |
+| `.github/workflows/ci.yml` | push 마다 백엔드 테스트·프론트 빌드/린트, main 이면 ARM 러너에서 arm64 이미지 → GHCR |
 | `.github/workflows/deploy.yml` | 배포 버튼 (OIDC → SSM → `deploy.sh`) |
 | `.github/workflows/cap.yml` | 상한 버튼 (OIDC → SSM → `cap.sh`) |
 
@@ -234,7 +234,7 @@ cd deploy && ./local.sh cap 5              # 상한 바꾸기 / ./local.sh down
 5. [ ] **Settings › Rules › Rulesets › New branch ruleset** → 이름 `main`, Enforcement **Active**, Target **Include default branch** → **Restrict deletions**·**Block force pushes** 만 켬. (PR 필수·상태 검사 필수는 켜지 않음 — main 에 바로 push 하는 작업 방식이라)
 6. [ ] **Settings › Advanced Security**(또는 Code security): **Secret scanning**·**Push protection** 켜기 (공개 저장소는 무료, 앞으로 실수로 올리는 토큰을 push 단계에서 막음) · **Dependabot alerts** 켜기
 7. [ ] (선택) **Settings › General**: 안 쓰는 **Projects** 끄기 · **Social preview** 에 `docs/screenshots/sea-friends/dolphin-float.jpg` 올리기 · 저장소 **About** 에 설명·주제(threejs, react-three-fiber, spring-boot, websocket)
-8. [ ] 확인: 로그아웃한 창(시크릿)에서 저장소 열어 README·사진 보이는지 → Claude 에게 "공개 전환 끝" → ci.yml ARM 러너로 바꾸기 ([progress.md](progress.md) "저장소 공개 뒤")
+8. [ ] 확인: 로그아웃한 창(시크릿)에서 저장소 열어 README·사진 보이는지 → ci.yml 이미지 작업은 ARM 러너(`ubuntu-24.04-arm`)로 바꿈 (11-11)
 
 ## 문제가 생기면
 - 배포 버튼이 빨간색: Actions 로그 맨 아래 SSM 출력에 `deploy.sh` 결과 (새 서버가 건강하지 않으면 이전 서버가 그대로 돌고 있음)
