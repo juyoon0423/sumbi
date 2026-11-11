@@ -287,3 +287,7 @@ dev.sh               백엔드 + 프론트 한 번에 실행
 | [troubleshooting.md](docs/troubleshooting.md) | 개발하며 만난 문제와 해결 |
 | [deploy.md](docs/deploy.md) · [deploy-plan.md](docs/deploy-plan.md) | 운영 구성과 배포 절차 |
 | [screenshots/](docs/screenshots/) | 단계별 확인 캡처 |
+
+---
+
+Copyright (c) 2026 박주윤. All rights reserved.

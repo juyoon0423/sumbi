@@ -207,7 +207,7 @@ cd deploy && ./local.sh cap 5              # 상한 바꾸기 / ./local.sh down
    - **Deployment branches and tags** → **Selected branches and tags** → `main` 추가
    - **Environment variables › Add variable** 세 개: `AWS_ROLE_ARN` = 5-5 의 ARN, `AWS_REGION` = `ap-northeast-2`, `EC2_INSTANCE_ID` = 4-3 의 `i-…`
    - (비밀 값은 없음: AWS 는 OIDC 라 키가 필요 없음)
-2. [ ] 저장소는 **private 유지**. 공개하기 전 "공개 전 점검" (아래).
+2. [ ] 저장소를 공개로 바꿀 거면 "공개 전 점검"·"공개로 바꾸기" (아래).
 
 ### 10. 첫 배포 (2단계 — 함께)
 1. [ ] main 에 push 되어 **Actions › CI** 초록색 → **Packages** 에 `sumbi-backend` 생김 (private).
@@ -221,6 +221,20 @@ cd deploy && ./local.sh cap 5              # 상한 바꾸기 / ./local.sh down
 - [ ] 커밋 기록 전체에서 비밀 찾기 (Claude 에게 "공개 전 점검" 이라고 하면 함께): `git log -p --all` 에서 웹훅·토큰·키 모양 검색, `gitleaks` 같은 도구로 한 번 더, 지운 파일(`git log --all --diff-filter=D --name-only`)도 확인
 - [ ] 나왔으면 그 값을 **먼저 폐기·재발급** (웹훅 삭제 후 새로, 토큰 revoke) → 그다음 기록 정리
 - [ ] Actions 로그·Packages 공개 범위 확인 (패키지는 저장소와 따로 private 유지 가능)
+
+> 2026-11-11 점검 완료: 파일·히스토리·지운 파일·브랜치에 비밀 없음. 커밋 작성자 이메일은 공개됨(그대로 두기로, 앞으로는 noreply). 라이선스 없이 "All rights reserved". Actions 실행 기록은 CI 4번뿐(배포 기록 없음)
+
+## 공개로 바꾸기 (사용자가 GitHub 에서 직접)
+1. [ ] **앞으로의 커밋 이메일을 noreply 로**: GitHub **Settings › Emails** → **Keep my email addresses private** 켜기 → 아래에 보이는 `<숫자>+juyoon0423@users.noreply.github.com` 복사 → 같은 화면 **Block command line pushes that expose my email** 켜기 → 이 저장소에서 `git config user.email "<복사한 주소>"` (모든 저장소면 `--global`) → `git config user.email` 로 확인
+2. [ ] 저장소 **Settings › General › Danger Zone › Change repository visibility** → **Make public** → 저장소 이름 입력. Packages(`sumbi-backend`)는 따로 private 로 남음 (서버는 `read:packages` 토큰으로 받으니 그대로)
+3. [ ] **Settings › Actions › General**
+   - **Fork pull request workflows from outside collaborators** → **Require approval for all outside collaborators**
+   - **Workflow permissions** → **Read repository contents and packages permissions** (지금 이미 읽기 전용) · **Allow GitHub Actions to create and approve pull requests** 끔
+4. [ ] **Settings › Environments › production**: Deployment branches 가 `main` 만인지. (원하면 **Required reviewers** 에 본인 → 배포 버튼 뒤 한 번 더 승인)
+5. [ ] **Settings › Rules › Rulesets › New branch ruleset** → 이름 `main`, Enforcement **Active**, Target **Include default branch** → **Restrict deletions**·**Block force pushes** 만 켬. (PR 필수·상태 검사 필수는 켜지 않음 — main 에 바로 push 하는 작업 방식이라)
+6. [ ] **Settings › Advanced Security**(또는 Code security): **Secret scanning**·**Push protection** 켜기 (공개 저장소는 무료, 앞으로 실수로 올리는 토큰을 push 단계에서 막음) · **Dependabot alerts** 켜기
+7. [ ] (선택) **Settings › General**: 안 쓰는 **Projects** 끄기 · **Social preview** 에 `docs/screenshots/sea-friends/dolphin-float.jpg` 올리기 · 저장소 **About** 에 설명·주제(threejs, react-three-fiber, spring-boot, websocket)
+8. [ ] 확인: 로그아웃한 창(시크릿)에서 저장소 열어 README·사진 보이는지 → Claude 에게 "공개 전환 끝" → ci.yml ARM 러너로 바꾸기 ([progress.md](progress.md) "저장소 공개 뒤")
 
 ## 문제가 생기면
 - 배포 버튼이 빨간색: Actions 로그 맨 아래 SSM 출력에 `deploy.sh` 결과 (새 서버가 건강하지 않으면 이전 서버가 그대로 돌고 있음)
